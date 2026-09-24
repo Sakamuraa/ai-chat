@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth";
 import { streamChat, generateTitle, type ChatMsg, type ChatPart } from "@/lib/gateway";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { checkQuota, estimateTokens } from "@/lib/quota";
+import { modelAllowed } from "@/lib/plans";
 import { addUsage, quotaState } from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
@@ -23,6 +24,8 @@ const Body = z.object({
   model: z.string().min(1).max(120),
   content: z.string().min(1).max(32_000),
   regenerate: z.boolean().optional(),
+  /** Edit prompt user: potong riwayat dari pesan ini lalu generate ulang (efek sama seperti Ulangi) */
+  editMessageId: z.string().uuid().optional(),
   attachments: z.array(Attachment).max(6).optional(),
 });
 
@@ -84,7 +87,8 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  const { sessionId, model, content, regenerate, attachments } = parsed.data;
+  const { sessionId, model, content, regenerate, editMessageId, attachments } = parsed.data;
+  const isEdit = Boolean(editMessageId) || Boolean(regenerate);
 
   // kuota per akun (15 chat / 10 mnt) dan per IP (30 / 10 mnt) — pembatas terakhir
   // setelah gerbang same-origin, supaya kunci gateway tak bisa dikuras skrip.
@@ -95,8 +99,14 @@ export async function POST(req: Request) {
     );
   }
 
+  // paket langit: model di luar hak akses ditolak di server
+  const st0 = await quotaState(user.id);
+  if (!modelAllowed(st0.plan, model)) {
+    return NextResponse.json({ error: "plan_model_forbidden", plan: st0.plan }, { status: 403 });
+  }
+
   // kuota token: batas harian (default 10 juta/24 jam) atau langganan aktif
-  const quota = checkQuota(await quotaState(user.id));
+  const quota = checkQuota(st0);
   if (!quota.ok) {
     return NextResponse.json({ error: "quota_exceeded", kind: quota.kind }, { status: 429 });
   }
@@ -113,28 +123,57 @@ export async function POST(req: Request) {
   const userText = withTextAttachments(content, attachments ?? []);
   const images = (attachments ?? []).filter((a) => a.kind === "image");
 
-  // 2. simpan pesan user (regenerate: ganti jawaban terakhir, jangan duplikat prompt)
-  if (regenerate) {
+  // 2. simpan pesan user
+  //    - regenerate: buang jawaban terakhir, prompt tetap
+  //    - edit: potong riwayat dari pesan yang diedit, ganti isinya, generate ulang
+  if (editMessageId) {
+    const target = (await db()`
+      SELECT id, created_at, role FROM messages WHERE id = ${editMessageId} AND session_id = ${sessionId}
+    `) as unknown as { id: string; created_at: string; role: string }[];
+    if (!target[0] || target[0].role !== "user") {
+      return NextResponse.json({ error: "message_not_found" }, { status: 404 });
+    }
     await db()`
       DELETE FROM messages
-      WHERE session_id = ${sessionId} AND role = 'assistant'
-        AND id = (SELECT max(id) FROM messages WHERE session_id = ${sessionId} AND role = 'assistant')
+      WHERE session_id = ${sessionId}
+        AND (created_at, id) >= (
+          SELECT created_at, id FROM messages
+          WHERE id = ${editMessageId} AND session_id = ${sessionId}
+        )
+    `;
+    await db()`
+      INSERT INTO messages (session_id, role, content, attachments)
+      VALUES (${sessionId}, 'user', ${userText}, ${JSON.stringify(attachments ?? [])}::jsonb)
+    `;
+    await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
+  } else if (regenerate) {
+    // max(uuid) tidak ada di Postgres -> pakai ORDER BY + LIMIT (akar bug tombol "Ulangi" = 500)
+    await db()`
+      DELETE FROM messages
+      WHERE session_id = ${sessionId}
+        AND id = (
+          SELECT id FROM messages
+          WHERE session_id = ${sessionId} AND role = 'assistant'
+          ORDER BY created_at DESC, id DESC
+          LIMIT 1
+        )
     `;
   } else {
-    const note = images.length > 0 ? `[foto: ${images.map((i) => i.name).join(", ")}] ` : "";
+    // preview selalu ada di UI -> lampiran disimpan di messages.attachments (tanpa prefix teks)
     await db()`
-      INSERT INTO messages (session_id, role, content) VALUES (${sessionId}, 'user', ${note + userText})
+      INSERT INTO messages (session_id, role, content, attachments)
+      VALUES (${sessionId}, 'user', ${userText}, ${JSON.stringify(attachments ?? [])}::jsonb)
     `;
     await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
   }
 
   // 3. riwayat + konteks sistem
   const history = (await db()`
-    SELECT role, content FROM messages
+    SELECT role, content, attachments FROM messages
     WHERE session_id = ${sessionId}
     ORDER BY created_at ASC, id ASC
     LIMIT 200
-  `) as unknown as { role: ChatMsg["role"]; content: string }[];
+  `) as unknown as { role: ChatMsg["role"]; content: string; attachments: unknown }[];
 
   const turns: ChatMsg[] = history.map((m) => ({ role: m.role, content: m.content }));
 
@@ -156,7 +195,7 @@ export async function POST(req: Request) {
 
   // 4. judul sesi: dijalankan BERSAMAAN dengan stream (model penalaran butuh ~10 dtk),
   //    jadi saat stream selesai judul sudah siap -> sidebar tidak pernah menampilkan 'New chat'.
-  const needsTitle = sessions[0].title === "New chat" && !regenerate;
+  const needsTitle = sessions[0].title === "New chat" && !isEdit;
   const titlePromise: Promise<string> = needsTitle
     ? generateTitle(
         `Pertanyaan user:\n${String(userText).slice(0, 500)}`,

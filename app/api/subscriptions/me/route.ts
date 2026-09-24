@@ -15,6 +15,8 @@ export async function GET() {
   const remaining = remainingToday(state);
 
   return NextResponse.json({
+    plan: state.plan,
+    models: state.models,
     dailyLimit: state.dailyLimit,
     dailyUsed: state.dailyUsed,
     remaining: Number.isFinite(remaining) ? remaining : null,

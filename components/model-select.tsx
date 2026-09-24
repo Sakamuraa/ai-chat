@@ -8,23 +8,35 @@ import { Check, CaretUpDown } from "@phosphor-icons/react";
 export const MODELS = [
   { id: "onheil-1.1-luna", label: "Onheil 1.1 Luna" },
   { id: "onheil-1.5-selenia", label: "Onheil 1.5 Selenia" },
+  { id: "onheil-2-asteria", label: "Onheil 2 Asteria" },
 ] as const;
+
+export function modelsFor(plan: string): ModelOption[] {
+  if (plan === "max") return [...MODELS];
+  if (plan === "pro") return MODELS.filter((m) => m.id !== "onheil-2-asteria");
+  return MODELS.filter((m) => m.id === "onheil-1.1-luna");
+}
 
 export function modelLabel(id: string): string {
   return MODELS.find((m) => m.id === id)?.label ?? id;
 }
+
+export type ModelOption = { id: string; label: string };
 
 export default function ModelSelect({
   value,
   onChange,
   label,
   direction = "up",
+  models = MODELS,
 }: {
   value: string;
   onChange: (id: string) => void;
   label?: string;
   /** "up" untuk composer di bawah, "down" untuk bar judul di atas (kalau atas: keluar layar) */
   direction?: "up" | "down";
+  /** daftar yang boleh dipakai — dipangkas sesuai paket (free/pro/max) */
+  models?: readonly ModelOption[];
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -65,7 +77,7 @@ export default function ModelSelect({
             direction === "up" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"
           }`}
         >
-          {MODELS.map((m) => {
+          {models.map((m) => {
             const active = m.id === value;
             return (
               <button

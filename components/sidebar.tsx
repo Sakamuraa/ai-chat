@@ -1,7 +1,7 @@
 // language: TypeScript, file: components/sidebar.tsx, target: client component
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -80,6 +80,9 @@ export default function Sidebar() {
   const [query, setQuery] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [auth, setAuth] = useState<"unknown" | "in" | "out">("unknown");
+  // tekan-tahan sesi (mobile) -> modal opsi
+  const [held, setHeld] = useState<Session | null>(null);
+  const holdTimer = useRef<number | null>(null);
 
   // mobile: mulai tertutup
   useEffect(() => {
@@ -176,6 +179,20 @@ export default function Sidebar() {
     week: t("nav.week"),
     older: t("nav.older"),
   };
+
+  function startHold(s: Session) {
+    if (holdTimer.current) window.clearTimeout(holdTimer.current);
+    holdTimer.current = window.setTimeout(() => {
+      setHeld(s);
+      setEditing(s.id);
+      setDraft(s.title === "New chat" ? "" : s.title);
+    }, 500); // 500ms = tahan jari; jari diangkat lebih cepat = klik biasa (buka sesi)
+  }
+
+  function cancelHold() {
+    if (holdTimer.current) window.clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  }
 
   const panel = (
     <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
@@ -278,7 +295,17 @@ export default function Sidebar() {
                 ) : (
                   <div
                     key={s.id}
-                    className={`group mb-1 flex items-center gap-1 rounded-xl px-3 py-2 transition ${
+                    onPointerDown={() => startHold(s)}
+                    onPointerUp={cancelHold}
+                    onPointerLeave={cancelHold}
+                    onPointerCancel={cancelHold}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setHeld(s);
+                      setEditing(s.id);
+                      setDraft(s.title === "New chat" ? "" : s.title);
+                    }}
+                    className={`group mb-1 flex touch-none items-center gap-1 rounded-xl px-3 py-2 transition ${
                       s.id === activeId ? "bg-[var(--border)]/70" : "hover:bg-[var(--border)]/45"
                     }`}
                   >
@@ -346,6 +373,70 @@ export default function Sidebar() {
 
   // Panel & toggle SELALU dirender supaya transisi slide in/out jalan
   // (bukan unmount/mount — itu yang bikin kemunculan mendadak).
+  const sessionMenu = held ? (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("session.menuTitle")}
+      onClick={() => setHeld(null)}
+    >
+      <div className="absolute inset-0 bg-black/55" />
+      <div
+        className="fade-up relative z-10 w-full max-w-sm rounded-t-2xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.45)] sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="mb-4 truncate text-sm font-medium" title={displayTitle(held)}>
+          {displayTitle(held)}
+        </p>
+
+        <label htmlFor="session-menu-title" className="mb-1.5 block text-[13px] font-medium">
+          {t("session.rename")}
+        </label>
+        <input
+          id="session-menu-title"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              rename(held.id);
+              setHeld(null);
+            }
+          }}
+          className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm text-[var(--fg)] focus:border-[var(--border-strong)]"
+        />
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() => {
+              rename(held.id);
+              setHeld(null);
+            }}
+            className="flex-1 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition active:scale-[0.98]"
+          >
+            {t("profile.save")}
+          </button>
+          <button
+            onClick={() => {
+              setHeld(null);
+              remove(held.id);
+            }}
+            className="rounded-full border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-4 py-2.5 text-sm font-medium text-[var(--danger)] transition"
+          >
+            {t("session.delete")}
+          </button>
+          <button
+            onClick={() => setHeld(null)}
+            className="rounded-full border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--muted)] transition"
+          >
+            {t("chat.cancel")}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       {/* Toggle global: tertutup -> logo OnheilAI, hover -> ikon sidebar */}
@@ -398,6 +489,6 @@ export default function Sidebar() {
           {panel}
         </div>
       </div>
+      {sessionMenu}
     </>
-  );
-}
+  );}

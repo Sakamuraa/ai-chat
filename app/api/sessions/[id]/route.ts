@@ -15,21 +15,38 @@ export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
 
   const sessions = (await db()`
-    SELECT id, title, model, created_at, updated_at
+    SELECT id, title, model, created_at, updated_at, share_enabled
     FROM sessions WHERE id = ${id} AND user_id = ${user.id}
-  `) as unknown as { id: string; title: string; model: string; created_at: string; updated_at: string }[];
+  `) as unknown as {
+    id: string;
+    title: string;
+    model: string;
+    created_at: string;
+    updated_at: string;
+    share_enabled: boolean;
+  }[];
   if (!sessions[0]) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   const messages = (await db()`
-    SELECT id, role, content, created_at
+    SELECT id, role, content, created_at, attachments
     FROM messages WHERE session_id = ${id}
     ORDER BY created_at ASC, id ASC
-  `) as unknown as { id: string; role: "user" | "assistant"; content: string; created_at: string }[];
+  `) as unknown as {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    created_at: string;
+    attachments: { name: string; kind: "image" | "text"; mime: string; data: string }[] | null;
+  }[];
 
   return NextResponse.json({ session: sessions[0], messages });
 }
 
-const Patch = z.object({ title: z.string().min(1).max(120) });
+const Patch = z.object({
+  title: z.string().min(1).max(120).optional(),
+  /** nyalakan/matikan tautan bagikan /s/<id> */
+  share: z.boolean().optional(),
+}).refine((v) => v.title !== undefined || v.share !== undefined, { message: "empty" });
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const user = await getSessionUser();
@@ -40,10 +57,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (!parsed.success) return NextResponse.json({ error: "invalid_body" }, { status: 400 });
 
   const rows = (await db()`
-    UPDATE sessions SET title = ${parsed.data.title}, updated_at = now()
+    UPDATE sessions SET
+      title = COALESCE(${parsed.data.title ?? null}, title),
+      share_enabled = COALESCE(${parsed.data.share ?? null}, share_enabled),
+      updated_at = now()
     WHERE id = ${id} AND user_id = ${user.id}
-    RETURNING id, title
-  `) as unknown as { id: string; title: string }[];
+    RETURNING id, title, share_enabled
+  `) as unknown as { id: string; title: string; share_enabled: boolean }[];
   if (!rows[0]) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   return NextResponse.json({ session: rows[0] });

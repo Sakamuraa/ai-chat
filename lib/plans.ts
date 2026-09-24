@@ -1,0 +1,59 @@
+// language: TypeScript, file: lib/plans.ts, target: hak akses model per paket (client & server)
+/**
+ * Paket (permintaan Manuel, 2026-09-24):
+ *   free -> onheil-1.1-luna
+ *   pro  -> + onheil-1.5-selenia
+ *   max  -> + onheil-2-asteria (Onheil 2 Asteria)
+ * Paket efektif = paket dari langganan aktif, kalau tidak ada -> paket bawaan akun.
+ */
+export type Plan = "free" | "pro" | "max";
+
+export const PLANS: { id: Plan; label: string }[] = [
+  { id: "free", label: "Standard" },
+  { id: "pro", label: "Pro" },
+  { id: "max", label: "Max" },
+];
+
+export const MODEL_LABELS: Record<string, string> = {
+  "onheil-1.1-luna": "Onheil 1.1 Luna",
+  "onheil-1.5-selenia": "Onheil 1.5 Selenia",
+  "onheil-2-asteria": "Onheil 2 Asteria",
+};
+
+const RANK: Record<Plan, number> = { free: 0, pro: 1, max: 2 };
+
+export const PLAN_MODELS: Record<Plan, string[]> = {
+  free: ["onheil-1.1-luna"],
+  pro: ["onheil-1.1-luna", "onheil-1.5-selenia"],
+  max: ["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-2-asteria"],
+};
+
+export function isPlan(v: unknown): v is Plan {
+  return v === "free" || v === "pro" || v === "max";
+}
+
+export function planRank(p: Plan): number {
+  return RANK[p];
+}
+
+/** Paket efektif: langganan aktif boleh menaikkan; tidak pernah menurunkan di bawah paket akun. */
+export function effectivePlan(
+  accountPlan: string | null | undefined,
+  subPlan: string | null | undefined,
+  subValidUntil: string | null | undefined,
+  now: Date = new Date(),
+): Plan {
+  const base: Plan = isPlan(accountPlan) ? accountPlan : "free";
+  if (subPlan && isPlan(subPlan) && subValidUntil && new Date(subValidUntil) > now) {
+    return RANK[subPlan] >= RANK[base] ? subPlan : base;
+  }
+  return base;
+}
+
+export function allowedModels(plan: Plan): string[] {
+  return PLAN_MODELS[plan];
+}
+
+export function modelAllowed(plan: Plan, model: string): boolean {
+  return PLAN_MODELS[plan].includes(model);
+}

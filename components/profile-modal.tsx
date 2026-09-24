@@ -51,6 +51,8 @@ export default function ProfileModal({
   } | null>(null);
   const [redeemCode, setRedeemCode] = useState("");
   const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [plan, setPlan] = useState<string>("free");
+  const [pickPlan, setPickPlan] = useState<"free" | "pro" | "max">("free");
   const [pickToken, setPickToken] = useState<number | null>(TOKEN_OPTIONS[0].value);
   const [pickHours, setPickHours] = useState<number>(DURATION_OPTIONS[0].hours);
   const [newCode, setNewCode] = useState("");
@@ -58,6 +60,7 @@ export default function ProfileModal({
     code: string;
     token_limit: number | null;
     duration_hours: number;
+    plan: string | null;
     revoked: boolean;
     redeemed_at: string | null;
     redeemer: string | null;
@@ -87,8 +90,10 @@ export default function ProfileModal({
         remaining: number | null;
         unlimited: boolean;
         dailyLimit: number;
+        plan?: string;
         sub: { tokenLimit: number | null; remaining: number | null; validUntil: string; sourceCode: string | null } | null;
       };
+      if (b.plan) setPlan(b.plan);
       setQuota({ dailyLimit: b.dailyLimit, remaining: b.remaining, unlimited: b.unlimited, sub: b.sub });
     } catch {
       /* diam */
@@ -141,7 +146,7 @@ export default function ProfileModal({
       const res = await fetch("/api/subscriptions/codes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tokenLimit: pickToken, durationHours: pickHours }),
+        body: JSON.stringify({ tokenLimit: pickToken, durationHours: pickHours, plan: pickPlan }),
       });
       if (res.ok) {
         const b = (await res.json()) as { code: string };
@@ -162,6 +167,9 @@ export default function ProfileModal({
     if (!open) return;
     void loadQuota();
     if (me?.is_admin) void loadCodes();
+    // sisa token ditarik ulang tiap 5 dtk supaya angkanya hidup saat dipantau
+    const iv = window.setInterval(() => void loadQuota(), 5000);
+    return () => window.clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, me?.is_admin]);
 
@@ -326,6 +334,19 @@ export default function ProfileModal({
           <p className="mt-1 text-xs text-[var(--muted)]">
             {t("sub.dailyQuota", { n: (quota?.dailyLimit ?? 10_000_000).toLocaleString("id-ID") })}
           </p>
+          <p className="mt-1 flex items-center gap-2 text-xs text-[var(--muted)]">
+            <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--fg)]">
+              {t("sub.plan")}: {plan === "pro" ? t("sub.planPro") : plan === "max" ? t("sub.planMax") : t("sub.planFree")}
+            </span>
+            <span data-testid="live-remaining">
+              {t("sub.liveRemaining")}:{" "}
+              <b className="text-[var(--fg)]">
+                {quota?.unlimited
+                  ? t("sub.unlimited")
+                  : (quota?.remaining ?? 0).toLocaleString("id-ID")}
+              </b>
+            </span>
+          </p>
 
           {quota?.sub ? (
             <div className="mt-3 space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm">
@@ -396,6 +417,23 @@ export default function ProfileModal({
               ))}
             </div>
 
+            <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.planPick")}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {(["free", "pro", "max"] as const).map((pl) => (
+                <button
+                  key={pl}
+                  onClick={() => setPickPlan(pl)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    pickPlan === pl
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--fg)]"
+                      : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]"
+                  }`}
+                >
+                  {pl === "free" ? t("sub.planFree") : pl === "pro" ? t("sub.planPro") : t("sub.planMax")}
+                </button>
+              ))}
+            </div>
+
             <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.durPick")}</p>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {DURATION_OPTIONS.map((o) => (
@@ -458,6 +496,9 @@ export default function ProfileModal({
                     >
                       <span className="min-w-0 flex-1 truncate font-mono text-[var(--fg)]">{c.code}</span>
                       <span className="shrink-0 text-[var(--muted)]">
+                        {c.plan && c.plan !== "free"
+                          ? `${c.plan.toUpperCase()} · `
+                          : ""}
                         {formatTokens(c.token_limit)} · {dur?.label ?? `${c.duration_hours}h`}
                       </span>
                       <span

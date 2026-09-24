@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Code, Image as ImageIcon, Lightning, Moon, Paperclip, Sun, TextAlignLeft, X } from "@phosphor-icons/react";
 import { BrandMark } from "./sidebar";
-import ModelSelect, { MODELS } from "./model-select";
+import ModelSelect, { MODELS, modelsFor, type ModelOption } from "./model-select";
 import { useI18n } from "./i18n";
 import { classifyFile, MAX_MB, type Attachment } from "@/lib/attachments";
 
@@ -15,6 +15,7 @@ export default function Landing({ username }: { username: string }) {
   const [text, setText] = useState("");
   const [name, setName] = useState(username);
   const [model, setModel] = useState<string>(MODELS[0].id);
+  const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
   const [dark, setDark] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachMenu, setAttachMenu] = useState(false);
@@ -38,6 +39,18 @@ export default function Landing({ username }: { username: string }) {
         .catch(() => {});
     sync();
     window.addEventListener("profile-changed", sync);
+    // daftar model dipangkas sesuai paket
+    fetch("/api/subscriptions/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b: { models?: string[]; plan?: string } | null) => {
+        if (!b?.models?.length) return;
+        const allowed = MODELS.filter((m) => b.models!.includes(m.id));
+        if (allowed.length) {
+          setOptions([...allowed]);
+          setModel((cur) => (allowed.some((m) => m.id === cur) ? cur : allowed[0].id));
+        }
+      })
+      .catch(() => {});
     return () => window.removeEventListener("profile-changed", sync);
   }, []);
 
@@ -222,7 +235,7 @@ export default function Landing({ username }: { username: string }) {
                 }}
               />
 
-              <ModelSelect value={model} onChange={setModel} label={t("profile.model")} />
+              <ModelSelect value={model} onChange={setModel} label={t("profile.model")} models={options} />
 
               <span className="hidden text-xs text-[var(--faint)] sm:inline">{t("landing.enterHint")}</span>
 
