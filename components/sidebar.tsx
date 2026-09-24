@@ -86,6 +86,12 @@ export default function Sidebar() {
     if (typeof window !== "undefined" && window.innerWidth < 768) setOpen(false);
   }, []);
 
+  // state sidebar dipublikasikan ke <html data-sidebar> supaya header bisa
+  // memberi ruang pada tombol toggle saat sidebar tertutup
+  useEffect(() => {
+    document.documentElement.dataset.sidebar = open ? "open" : "closed";
+  }, [open]);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/sessions");

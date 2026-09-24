@@ -229,3 +229,17 @@ body {
   0% { transform: translateX(-120%); }
   100% { transform: translateX(320%); }
 }
+
+/* Ruang header chat: mobile selalu beri jarak ke ikon sidebar (fixed left-3);
+   desktop hanya saat sidebar tertutup (tombol toggle logo->ikon duduk di kiri atas). */
+.chat-header {
+  padding-left: 2.5rem;
+}
+@media (min-width: 640px) {
+  html[data-sidebar="open"] .chat-header {
+    padding-left: 1rem;
+  }
+  html[data-sidebar="closed"] .chat-header {
+    padding-left: 3.75rem;
+  }
+}

@@ -18,10 +18,13 @@ export default function ModelSelect({
   value,
   onChange,
   label,
+  direction = "up",
 }: {
   value: string;
   onChange: (id: string) => void;
   label?: string;
+  /** "up" untuk composer di bawah, "down" untuk bar judul di atas (kalau atas: keluar layar) */
+  direction?: "up" | "down";
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -58,7 +61,9 @@ export default function ModelSelect({
       {open ? (
         <div
           role="listbox"
-          className="fade-up absolute bottom-[calc(100%+8px)] right-0 z-30 w-[248px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)]"
+          className={`fade-up absolute right-0 z-30 w-[248px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)] ${
+            direction === "up" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"
+          }`}
         >
           {MODELS.map((m) => {
             const active = m.id === value;

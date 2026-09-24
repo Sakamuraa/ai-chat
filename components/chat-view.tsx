@@ -330,8 +330,8 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-3 backdrop-blur-md sm:px-5">
-        <div className="min-w-0 flex-1 pl-10 sm:pl-0">
+      <header className="chat-header flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-3 backdrop-blur-md sm:px-5">
+        <div className="min-w-0 flex-1">
           {editingTitle ? (
             <input
               autoFocus
@@ -362,7 +362,7 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
           )}
         </div>
 
-        <ModelSelect value={currentModel} onChange={setCurrentModel} label={t("profile.model")} />
+        <ModelSelect value={currentModel} onChange={setCurrentModel} label={t("profile.model")} direction="down" />
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
