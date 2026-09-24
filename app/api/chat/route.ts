@@ -327,12 +327,41 @@ export async function POST(req: Request) {
                 content: results[i].ok ? results[i].text : `ERROR: ${results[i].error}`,
               })),
             ];
-            gateway = await streamChat(model, conv, abort.signal, tools);
+            // ronde terakhir: TANPA tools supaya model wajib menjawab
+            gateway = rounds >= 4
+              ? await streamChat(model, conv, abort.signal)
+              : await streamChat(model, conv, abort.signal, tools);
             reader = gateway.body!.getReader();
             continue;
           }
 
-          const assistantText = (allText + roundText).trim();
+          let assistantText = (allText + roundText).trim();
+
+          // kosong setelah putaran tool -> paksa sekali lagi tanpa tools
+          if (!assistantText) {
+            roundText = "";
+            finish = null;
+            lineBuf = "";
+            calls.length = 0;
+            try {
+              gateway = await streamChat(model, [
+                ...conv,
+                { role: "user", content: "Jawab sekarang, langsung ke inti tanpa tool." },
+              ], abort.signal);
+              reader = gateway.body!.getReader();
+              const { value, done } = await reader.read();
+              if (value) { feed(value); ctrl.enqueue(value); }
+              if (!done) continue;
+              assistantText = (allText + roundText).trim();
+            } catch (e) {
+              console.error("forced final failed", e);
+            }
+          }
+          if (!assistantText) {
+            assistantText = "Model tidak mengeluarkan teks pada putaran ini. Kirim ulang pertanyaannya.";
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: assistantText } }] })}\n\n`));
+          }
+
           try {
             if (assistantText) {
               await db()`
