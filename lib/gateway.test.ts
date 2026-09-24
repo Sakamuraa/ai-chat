@@ -1,6 +1,6 @@
 // language: TypeScript, file: lib/gateway.test.ts, target: vitest — sanitasi judul sesi
 import { describe, it, expect } from "vitest";
-import { sanitizeTitle } from "./gateway";
+import { sanitizeTitle, titleLooksLikeCopy } from "./gateway";
 
 describe("sanitizeTitle", () => {
   it("membuang markdown, petik, dan simbol", () => {
@@ -33,5 +33,20 @@ describe("sanitizeTitle", () => {
 
   it("kode blok utuh dibuang, bukan dijadikan judul", () => {
     expect(sanitizeTitle("```js\nconst a = 1;\n```")).toBe("");
+  });
+});
+
+describe("titleLooksLikeCopy", () => {
+  it("menangkap judul yang menyalin prompt user", () => {
+    expect(titleLooksLikeCopy("Halo Kamu Siapa", "halo kamu siapa")).toBe(true);
+    expect(titleLooksLikeCopy("Kenapa File Docx Tidak Bisa", "kenapa file docx tidak bisa dibuka")).toBe(true);
+    expect(titleLooksLikeCopy("Template Paper Progress Web App", "buatkan template paper progress web app beasiswa")).toBe(true);
+  });
+
+  it("menerima judul topik yang benar-benar berbeda", () => {
+    expect(titleLooksLikeCopy("Pembukaan Percakapan", "halo kamu siapa")).toBe(false);
+    expect(titleLooksLikeCopy("Fotosintesis", "jelaskan cara kerja fotosintesis pada tumbuhan")).toBe(false);
+    expect(titleLooksLikeCopy("Template Paper Webapp", "buatkan template paper progress web app beasiswa")).toBe(false);
+    expect(titleLooksLikeCopy("Dokumen Docx Gagal", "kenapa file docx saya tidak bisa dibuka")).toBe(false);
   });
 });

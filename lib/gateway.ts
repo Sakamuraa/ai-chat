@@ -106,26 +106,74 @@ export function sanitizeTitle(raw: string): string {
     .slice(0, 60);
 }
 
+/** Normalisasi untuk mendeteksi judul yang cuma menyalin prompt. */
+function normForCompare(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** true kalau judul hanya salinan/potongan kasar dari teks user. */
+export function titleLooksLikeCopy(title: string, source: string): boolean {
+  const nt = normForCompare(title);
+  const ns = normForCompare(source.replace(/^Pertanyaan user:\s*/i, ""));
+  if (!nt || !ns) return false;
+  if (nt === ns) return true;
+  // judul = awal/akhir prompt yang dipotong kasar (atau prompt muat di judul)
+  if (nt.length >= 4 && (ns.startsWith(nt) || nt.startsWith(ns))) return true;
+  // judul = potongan verbatim >= 3 kata berturut-turut dari prompt -> tetap salinan
+  const tw = nt.split(" ");
+  const sw = ns.split(" ");
+  if (tw.length >= 3 && sw.length >= tw.length) {
+    for (let i = 0; i + tw.length <= sw.length; i++) {
+      if (sw.slice(i, i + tw.length).join(" ") === nt) return true;
+    }
+  }
+  return false;
+}
+
+const TITLE_RULES =
+  "You name chat sessions. Reply with 3 to 5 words, Title Case, plain words only. " +
+  "NO markdown, NO quotes, NO symbols, NO punctuation, NO explanation. Words separated by single spaces. " +
+  "NEVER copy, repeat, translate or lightly trim the user's own words - write a fresh TOPIC label instead. " +
+  "Examples: user says 'halo kamu siapa' -> 'Pembukaan Percakapan'; " +
+  "user says 'buatkan template paper progress web app' -> 'Template Paper Webapp'; " +
+  "user says 'kenapa file docx tidak bisa dibuka' -> 'Dokumen Docx Gagal'.";
+
 /**
- * Judul = ringkasan/inti pembahasan (permintaan Manuel), maksimal 5 kata.
- * Input berisi pertanyaan user + jawaban pertama, bukan hanya prompt pertama.
+ * Judul = ringkasan/topik pembahasan (permintaan Manuel), maksimal 5 kata.
+ * Input berisi pertanyaan user (dipanggil bersamaan dengan stream, jadi jawaban belum ada).
+ * Dua putaran: percobaan normal, kalau hasilnya cuma salinan prompt -> putaran kedua
+ * dengan larangan menyalin yang lebih tegas; tetap menyalin -> "" (caller biarkan 'New chat').
  * Fail-open: string kosong -> caller membiarkan 'New chat'.
  */
 export async function generateTitle(exchange: string): Promise<string> {
-  const sys: ChatMsg = {
-    role: "system",
-    content:
-      "You name chat sessions. Reply with 3 to 5 words, Title Case, plain words only. NO markdown, NO quotes, NO symbols, NO punctuation, NO explanation. Words separated by single spaces.",
-  };
   const user: ChatMsg = { role: "user", content: exchange.slice(0, 700) };
+  const passes: ChatMsg[] = [
+    { role: "system", content: TITLE_RULES },
+    {
+      role: "system",
+      content:
+        TITLE_RULES +
+        " CRITICAL: your answer must not be a substring of the user's message. " +
+        "If you catch yourself echoing the user, replace it with the underlying topic.",
+    },
+  ];
 
-  for (const model of TITLE_CANDIDATES()) {
-    try {
-      const out = await completeChat(model, [sys, user]);
-      const title = sanitizeTitle(out);
-      if (title) return title;
-    } catch {
-      /* kandidat berikutnya */
+  const candidates = TITLE_CANDIDATES();
+  for (let pass = 0; pass < passes.length; pass++) {
+    for (const model of candidates) {
+      try {
+        const out = await completeChat(model, [passes[pass], user]);
+        const title = sanitizeTitle(out);
+        if (!title) continue;
+        if (titleLooksLikeCopy(title, exchange)) continue; // salinan -> coba lagi
+        return title;
+      } catch {
+        /* kandidat berikutnya */
+      }
     }
   }
   return "";
