@@ -46,7 +46,7 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
   const displayTitle = heading === "New chat" ? (firstUser ?? "Chat baru") : heading;
 
   useEffect(() => {
-    document.title = `${displayTitle} · AI`;
+    document.title = `${displayTitle} · OnheilAI`;
   }, [displayTitle]);
 
   useEffect(() => {

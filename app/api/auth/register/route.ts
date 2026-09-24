@@ -8,8 +8,15 @@ import { allow, clientIp } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 
 const Body = z.object({
-  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_.-]+$/, "hanya huruf/angka/_.-"),
-  password: z.string().min(8).max(128),
+  username: z
+    .string()
+    .min(3, "Username minimal 3 karakter")
+    .max(32, "Username maksimal 32 karakter")
+    .regex(/^[a-zA-Z0-9_.-]+$/, "Username hanya boleh huruf, angka, _ . -"),
+  password: z
+    .string()
+    .min(8, "Password minimal 8 karakter")
+    .max(128, "Password maksimal 128 karakter"),
 });
 
 export async function POST(req: Request) {

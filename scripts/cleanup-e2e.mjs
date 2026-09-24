@@ -16,7 +16,9 @@ if (!line) {
 const sql = neon(line.slice("DATABASE_URL=".length).trim());
 
 const removed = await sql`
-  DELETE FROM users WHERE username IN ('e2e_alice', 'e2e_bob') RETURNING username
+  DELETE FROM users
+  WHERE username IN ('e2e_alice', 'e2e_bob', 'manuel_probe', 'manuel_ui', 'manuel_ui2')
+  RETURNING username
 `;
 console.log("user dihapus:", removed.map((r) => r.username).join(", ") || "(tidak ada)");
 

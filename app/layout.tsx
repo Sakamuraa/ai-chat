@@ -18,8 +18,9 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "AI", template: "%s · AI" },
-  description: "Antarmuka chat dengan sesi tersimpan.",
+  title: { default: "OnheilAI", template: "%s · OnheilAI" },
+  description: "Chat OnheilAI: sesi tersimpan per akun, judul otomatis, banyak model.",
+  openGraph: { title: "OnheilAI", images: ["/og.png"] },
 };
 
 export const viewport: Viewport = {

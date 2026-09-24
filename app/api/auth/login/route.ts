@@ -7,7 +7,10 @@ import { allow, clientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
-const Body = z.object({ username: z.string().min(1).max(64), password: z.string().min(1).max(128) });
+const Body = z.object({
+  username: z.string().min(1, "Isi username").max(64),
+  password: z.string().min(1, "Isi password").max(128),
+});
 
 export async function POST(req: Request) {
   if (!allow(`login:${clientIp(req.headers)}`, 10)) {

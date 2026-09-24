@@ -37,6 +37,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
         );
         return;
       }
+      window.dispatchEvent(new Event("sessions-changed")); // sidebar baca ulang status login
       router.replace("/");
       router.refresh();
     } finally {
@@ -54,7 +55,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       >
         <BrandMark size={28} />
         <h1 className="mt-5 text-[22px] font-semibold tracking-tight">
-          {isLogin ? "Masuk ke akun kamu" : "Buat akun baru"}
+          {isLogin ? "Masuk ke OnheilAI" : "Buat akun OnheilAI"}
         </h1>
         <p className="mt-1.5 text-sm text-[var(--muted)]">
           {isLogin
