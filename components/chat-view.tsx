@@ -89,6 +89,8 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
         if (b?.models?.length) {
           const allowed = MODELS.filter((m) => b.models!.includes(m.id));
           setOptions(allowed.length ? allowed : modelsFor(b.plan ?? "free"));
+        // paksa model sesuai paket (default lama di luar hak akses) -> jatuhkan ke model pertama yang sah
+        setCurrentModel((cur) => (b.models?.includes(cur) ? cur : (allowed[0]?.id ?? cur)));
           setCurrentModel((cur) => (allowed.some((m) => m.id === cur) ? cur : (allowed[0]?.id ?? cur)));
         }
       })
