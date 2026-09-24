@@ -1,9 +1,10 @@
 // language: TypeScript, file: components/model-select.tsx, target: dropdown custom (bukan <select>)
-// Daftar model DIPATOK dua: onheil-1.1-luna & onheil-1.5-selenia (keputusan Manuel, jangan tarik /api/models).
+// Ketiga model SELALU tampil; yang di luar paket diberi label Pro/Max dan tidak bisa dipilih.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, CaretUpDown } from "@phosphor-icons/react";
+import { Check, CaretUpDown, LockSimple } from "@phosphor-icons/react";
+import { MODEL_BADGE } from "@/lib/plans";
 
 export const MODELS = [
   { id: "onheil-1.1-luna", label: "Onheil 1.1 Luna" },
@@ -29,18 +30,23 @@ export default function ModelSelect({
   label,
   direction = "up",
   models = MODELS,
+  lockedIds = [],
 }: {
   value: string;
   onChange: (id: string) => void;
   label?: string;
   /** "up" untuk composer di bawah, "down" untuk bar judul di atas (kalau atas: keluar layar) */
   direction?: "up" | "down";
-  /** daftar yang boleh dipakai — dipangkas sesuai paket (free/pro/max) */
+  /** daftar yang ditampilkan — default ketiga model, tidak dipangkas */
   models?: readonly ModelOption[];
+  /** id model di luar paket user: tampil berlabel, tidak bisa dipilih */
+  lockedIds?: readonly string[];
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const current = modelLabel(value);
+  const currentValueBadge = MODEL_BADGE[value] ?? "";
+  const isLocked = (id: string) => lockedIds.includes(id);
 
   useEffect(() => {
     if (!open) return;
@@ -67,6 +73,7 @@ export default function ModelSelect({
         className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel)] py-1.5 pl-3 pr-2.5 text-xs font-medium text-[var(--muted)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-[var(--border-strong)] hover:text-[var(--fg)]"
       >
         <span className="max-w-[150px] truncate">{current}</span>
+        {currentValueBadge ? <Badge text={currentValueBadge} /> : null}
         <CaretUpDown size={13} className={open ? "rotate-180 transition" : "transition"} />
       </button>
 
@@ -79,30 +86,54 @@ export default function ModelSelect({
         >
           {models.map((m) => {
             const active = m.id === value;
+            const locked = isLocked(m.id);
+            const badge = MODEL_BADGE[m.id] ?? "";
             return (
               <button
                 key={m.id}
                 type="button"
                 role="option"
                 aria-selected={active}
+                aria-disabled={locked}
+                title={locked ? `${badge}` : undefined}
                 onClick={() => {
+                  if (locked) return; // terkunci: hanya ditampilkan berlabel
                   onChange(m.id);
                   setOpen(false);
                 }}
                 className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition ${
-                  active ? "bg-[var(--accent-soft)] text-[var(--fg)]" : "text-[var(--muted)] hover:bg-[var(--border)]/60 hover:text-[var(--fg)]"
+                  active
+                    ? "bg-[var(--accent-soft)] text-[var(--fg)]"
+                    : locked
+                      ? "cursor-not-allowed text-[var(--faint)]"
+                      : "text-[var(--muted)] hover:bg-[var(--border)]/60 hover:text-[var(--fg)]"
                 }`}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{m.label}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-medium">{m.label}</span>
+                    {badge ? <Badge text={badge} /> : null}
+                  </span>
                   <span className="block truncate text-[11px] text-[var(--faint)]">{m.id}</span>
                 </span>
-                {active ? <Check size={15} weight="bold" className="shrink-0 text-[#a16207] dark:text-[var(--accent)]" /> : null}
+                {locked ? <LockSimple size={14} className="shrink-0" /> : null}
+                {active && !locked ? (
+                  <Check size={15} weight="bold" className="shrink-0 text-[#a16207] dark:text-[var(--accent)]" />
+                ) : null}
               </button>
             );
           })}
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** label paket kecil di samping nama model */
+function Badge({ text }: { text: string }) {
+  return (
+    <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+      {text}
+    </span>
   );
 }

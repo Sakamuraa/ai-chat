@@ -15,6 +15,7 @@ export default function Landing({ username }: { username: string }) {
   const [text, setText] = useState("");
   const [name, setName] = useState(username);
   const [model, setModel] = useState<string>(MODELS[0].id);
+  const [lockedIds, setLockedIds] = useState<string[]>([]);
   const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
   const [dark, setDark] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -46,7 +47,9 @@ export default function Landing({ username }: { username: string }) {
         if (!b?.models?.length) return;
         const allowed = MODELS.filter((m) => b.models!.includes(m.id));
         if (allowed.length) {
-          setOptions([...allowed]);
+          // ketiga model tetap ditampil; yang di luar paket dikunci berlabel Pro/Max
+          setOptions([...MODELS]);
+          setLockedIds(MODELS.filter((m) => !b.models!.includes(m.id)).map((m) => m.id));
           setModel((cur) => (allowed.some((m) => m.id === cur) ? cur : allowed[0].id));
         }
       })
@@ -235,7 +238,7 @@ export default function Landing({ username }: { username: string }) {
                 }}
               />
 
-              <ModelSelect value={model} onChange={setModel} label={t("profile.model")} models={options} />
+              <ModelSelect value={model} onChange={setModel} label={t("profile.model")} models={options} lockedIds={lockedIds} />
 
               <span className="hidden text-xs text-[var(--faint)] sm:inline">{t("landing.enterHint")}</span>
 

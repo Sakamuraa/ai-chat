@@ -57,3 +57,10 @@ export function allowedModels(plan: Plan): string[] {
 export function modelAllowed(plan: Plan, model: string): boolean {
   return PLAN_MODELS[plan].includes(model);
 }
+
+/** Badge paket yang dibutuhkan tiap model (tampil di dropdown walau paket belum punya) */
+export const MODEL_BADGE: Record<string, string> = {
+  "onheil-1.1-luna": "",
+  "onheil-1.5-selenia": "Pro",
+  "onheil-2-asteria": "Max",
+};

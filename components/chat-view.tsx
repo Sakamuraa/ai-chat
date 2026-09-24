@@ -53,6 +53,7 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [error, setError] = useState("");
   const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
   const [currentModel, setCurrentModel] = useState(model || MODELS[0].id);
+  const [lockedIds, setLockedIds] = useState<string[]>([]);
   const [heading, setHeading] = useState(title);
   const [attachments, setAttachments] = useState<UiAttachment[]>([]);
   const [attachMenu, setAttachMenu] = useState(false);
@@ -88,10 +89,11 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
       .then((b: { models?: string[]; plan?: string } | null) => {
         if (b?.models?.length) {
           const allowed = MODELS.filter((m) => b.models!.includes(m.id));
-          setOptions(allowed.length ? allowed : modelsFor(b.plan ?? "free"));
-        // paksa model sesuai paket (default lama di luar hak akses) -> jatuhkan ke model pertama yang sah
-        setCurrentModel((cur) => (b.models?.includes(cur) ? cur : (allowed[0]?.id ?? cur)));
-          setCurrentModel((cur) => (allowed.some((m) => m.id === cur) ? cur : (allowed[0]?.id ?? cur)));
+          // ketiga model tetap ditampil; yang di luar paket dikunci berlabel Pro/Max
+          setOptions([...MODELS]);
+          setLockedIds(MODELS.filter((m) => !b.models!.includes(m.id)).map((m) => m.id));
+          // paksa model aktif ikut hak akses paket
+          setCurrentModel((cur) => (allowed.some((m) => m.id === cur) ? cur : allowed[0].id));
         }
       })
       .catch(() => {});
@@ -414,6 +416,7 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
             <ModelSelect
               value={currentModel}
               onChange={setCurrentModel}
+              lockedIds={lockedIds}
               label={t("profile.model")}
               direction="down"
               models={options}
