@@ -52,14 +52,32 @@ export default function ModelSelect({
   const isLocked = (id: string) => lockedIds.includes(id);
 
   useEffect(() => {
-    if (!open) return setGeo(null);
-    const r = box.current?.getBoundingClientRect();
-    if (!r) return setGeo(null);
-    const width = Math.min(262, Math.max(200, window.innerWidth - 16));
-    // default: menu melebar ke kiri (ujung kanan sejajar tombol), lalu dijepit ke dalam layar
-    const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8));
-    const v = direction === "up" ? { bottom: Math.max(8, window.innerHeight - r.top + 8) } : { top: r.bottom + 8 };
-    setGeo({ left, width, ...v });
+    if (!open) {
+      setGeo(null);
+      return;
+    }
+    // ukur & pasang menu supaya selalu di dalam viewport, sejajar dengan tombolnya
+    const apply = () => {
+      const r = box.current?.getBoundingClientRect();
+      if (!r) return setGeo(null);
+      const vw = window.innerWidth;
+      const width = Math.min(262, Math.max(200, vw - 16));
+      // tengahkan menu pada tombol, lalu dijepit agar tak keluar layar
+      const left = Math.min(Math.max(8, r.left + r.width / 2 - width / 2), Math.max(8, vw - width - 8));
+      const v =
+        direction === "up"
+          ? { bottom: Math.max(8, window.innerHeight - r.top + 8) }
+          : { top: Math.max(8, r.bottom + 8) };
+      setGeo({ left, width, ...v });
+    };
+    apply();
+    // bilah alamat HP berubah tinggi saat scroll -> posisi dihitung ulang
+    window.addEventListener("resize", apply);
+    window.addEventListener("orientationchange", apply);
+    return () => {
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("orientationchange", apply);
+    };
   }, [open, direction]);
 
   useEffect(() => {
