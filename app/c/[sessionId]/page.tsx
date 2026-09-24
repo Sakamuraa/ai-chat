@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import ChatView, { type Msg } from "@/components/chat-view";
 import { slimAttachments, type Attachment } from "@/lib/attachments";
+import { isUuid } from "@/lib/uuid";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,22 @@ export default async function SessionPage({ params }: Props) {
     return <ChatView key="new" sessionId="new" title="New chat" model="" initialMessages={[]} owner />;
   }
 
+  // bukan uuid (mis. /c/none) -> 404, jangan biarkan Postgres 22P02 -> 500
+  if (!isUuid(sessionId)) notFound();
+
   const sessions = (await db()`
     SELECT id, title, model FROM sessions WHERE id = ${sessionId} AND user_id = ${user.id}
   `) as unknown as { id: string; title: string; model: string }[];
-  if (!sessions[0]) notFound();
+  if (!sessions[0]) {
+    // Bukan milik user ini. Kalau sesi itu sedang dibagikan, alihkan ke tampilan
+    // hanya-baca (/s/) — dulu balik 404 walau share_enabled=true.
+    // Kalau tidak dibagikan, tetap 404 supaya keberadaan sesi orang tak bocor.
+    const shared = (await db()`
+      SELECT id FROM sessions WHERE id = ${sessionId} AND share_enabled = true
+    `) as unknown as { id: string }[];
+    if (shared[0]) redirect(`/s/${shared[0].id}`);
+    notFound();
+  }
 
   const messages = (await db()`
     SELECT id, role, content, created_at, attachments FROM messages
