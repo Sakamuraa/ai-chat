@@ -238,7 +238,7 @@ export default function Landing({ username }: { username: string }) {
                 }}
               />
 
-              <ModelSelect value={model} onChange={setModel} label={t("profile.model")} models={options} lockedIds={lockedIds} />
+              <ModelSelect value={model} onChange={(m) => { setModel(m); try { localStorage.setItem("onheil.model", m); } catch { /* storage diblokir */ } }} label={t("profile.model")} models={options} lockedIds={lockedIds} />
 
               <span className="hidden text-xs text-[var(--faint)] sm:inline">{t("landing.enterHint")}</span>
 

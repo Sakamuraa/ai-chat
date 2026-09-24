@@ -16,7 +16,7 @@ const Attachment = z.object({
   name: z.string().min(1).max(120),
   kind: z.enum(["image", "text"]),
   mime: z.string().max(80),
-  data: z.string().max(4_000_000), // data URL (image) atau teks isi file
+  data: z.string().max(8_000_000), // data URL (image) atau teks isi file — foto sisa base64 gampang > 4 juta
 });
 
 const Body = z.object({
@@ -56,7 +56,11 @@ async function systemMessages(userId: string): Promise<ChatMsg[]> {
         (u.personality?.trim()
           ? `Gaya jawaban yang diminta user: ${u.personality.trim()}\n\n`
           : "") +
-        `Kamu sedang melayani username "${u.username}" di OnheilAI. Jawab dalam bahasa percakapan user.`,
+        `Kamu sedang melayani username "${u.username}" di OnheilAI. Jawab dalam bahasa percakapan user.\n\n` +
+        "Antarmuka ini TIDAK punya tool eksternal: tanpa browsing, tanpa terminal, tanpa akses file/repo pengguna. " +
+        "Jangan pernah menjawab bahwa tool sedang mati, rusak, atau tidak tersedia — itu bukan penjelasan yang benar. " +
+        "Kalau user minta melihat isi repo/file, jawab dari pengetahuanmu dan minta dia menempelkan isi file atau potongan kodenya, " +
+        "lalu lanjutkan menganalisis begitu dikirim.",
     },
   ];
 
@@ -82,10 +86,15 @@ export async function POST(req: Request) {
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "invalid_body", detail: parsed.error.issues[0]?.message ?? "Data tidak valid" },
-      { status: 400 },
-    );
+    const issue = parsed.error.issues[0];
+    const path = (issue?.path ?? []).map(String).join(".");
+    // pesan zod berbahasa Inggris ("Too big: ...") jangan sampai tampil ke user
+    const detail = path.startsWith("attachments")
+      ? "Lampiran terlalu besar untuk dikirim. Kecilkan gambarnya atau pakai file yang lebih kecil."
+      : path.startsWith("content")
+        ? "Pesan terlalu panjang. Pecah jadi beberapa bagian."
+        : "Data tidak valid.";
+    return NextResponse.json({ error: "invalid_body", detail }, { status: 400 });
   }
   const { sessionId, model, content, regenerate, editMessageId, attachments } = parsed.data;
   const isEdit = Boolean(editMessageId) || Boolean(regenerate);

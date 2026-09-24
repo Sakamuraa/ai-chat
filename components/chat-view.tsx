@@ -52,7 +52,16 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [streamText, setStreamText] = useState("");
   const [error, setError] = useState("");
   const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
-  const [currentModel, setCurrentModel] = useState(model || MODELS[0].id);
+  // model terakhir dipilih disimpan di localStorage supaya halaman sesi tak kembali ke model awal
+  const [currentModel, setCurrentModel] = useState<string>(() => {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("onheil.model");
+    } catch {
+      saved = null;
+    }
+    return saved || model || MODELS[0].id;
+  });
   const [lockedIds, setLockedIds] = useState<string[]>([]);
   const [heading, setHeading] = useState(title);
   const [attachments, setAttachments] = useState<UiAttachment[]>([]);
@@ -151,6 +160,40 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+/** Kecilkan gambar di sisi klien: sisi terpanjang 1600px, JPEG kualitas 0.82.
+ *  Base64 foto asli gampang melewati batas 4 juta karakter di server ("Too big"). */
+async function compressImage(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error("gagal_baca_gambar"));
+      i.src = dataUrl;
+    });
+    const MAX_SIDE = 1600;
+    const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, w, h);
+    const out = canvas.toDataURL("image/jpeg", 0.82);
+    // JPEG lebih besar dari aslinya? pakai yang asli saja
+    return out.length < dataUrl.length ? out : dataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
+
   async function pickFiles(list: FileList | null) {
     if (!list) return;
     for (const file of Array.from(list)) {
@@ -165,15 +208,7 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
         continue;
       }
       setError("");
-      const data =
-        cls === "image"
-          ? await new Promise<string>((res, rej) => {
-              const r = new FileReader();
-              r.onload = () => res(String(r.result));
-              r.onerror = () => rej(r.error);
-              r.readAsDataURL(file);
-            })
-          : await file.text();
+      const data = cls === "image" ? await compressImage(file) : await file.text();
       setAttachments((prev) =>
         prev.length >= 6
           ? prev
@@ -205,6 +240,15 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
         histIdx.current = next;
         setInput(historyRef.current[next]);
       }
+    }
+  }
+
+  function persistModel(m: string) {
+    setCurrentModel(m);
+    try {
+      localStorage.setItem("onheil.model", m);
+    } catch {
+      /* storage diblokir — abaikan */
     }
   }
 
@@ -276,11 +320,10 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
     opts: { regenerate?: boolean; editIndex?: number } = {},
   ) {
     if (readOnly || streaming || (!content.trim() && files.length === 0)) return;
-    const wasEmptyInput = !input.trim();
-    if (wasEmptyInput) {
-      setInput("");
-      setAttachments([]);
-    }
+    // kosongkan komposer SELALU — dulu terbalik (hanya saat input sudah kosong),
+    // sehingga prompt + lampiran menumpuk di input setelah submit
+    setInput("");
+    setAttachments([]);
     histIdx.current = -1;
 
     let sid = id;
@@ -419,7 +462,7 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
             ) : null}
             <ModelSelect
               value={currentModel}
-              onChange={setCurrentModel}
+              onChange={persistModel}
               lockedIds={lockedIds}
               label={t("profile.model")}
               direction="down"
