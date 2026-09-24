@@ -205,9 +205,11 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
       });
 
       if (!res.ok || !res.body) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+        const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string; kind?: string };
         if (body.error === "rate_limited") {
           setError(t("chat.rateLimited"));
+        } else if (body.error === "quota_exceeded") {
+          setError(body.kind === "sub_exhausted" ? t("chat.quotaSub") : t("chat.quotaDaily", { n: "10.000.000" }));
         } else {
           setError(body.detail ? `${body.detail}` : `Error ${res.status}`);
         }

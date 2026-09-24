@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { streamChat, generateTitle, type ChatMsg, type ChatPart } from "@/lib/gateway";
 import { allow, clientIp } from "@/lib/rate-limit";
+import { checkQuota, estimateTokens } from "@/lib/quota";
+import { addUsage, quotaState } from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -91,6 +93,12 @@ export async function POST(req: Request) {
       { error: "rate_limited", detail: "Terlalu banyak permintaan. Tunggu beberapa menit." },
       { status: 429 },
     );
+  }
+
+  // kuota token: batas harian (default 10 juta/24 jam) atau langganan aktif
+  const quota = checkQuota(await quotaState(user.id));
+  if (!quota.ok) {
+    return NextResponse.json({ error: "quota_exceeded", kind: quota.kind }, { status: 429 });
   }
 
   const abort = new AbortController();
@@ -184,6 +192,9 @@ export async function POST(req: Request) {
               `;
               await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
             }
+            // kuota: pakai `usage` dari stream kalau gateway menyertakannya, kalau tidak perkirakan
+            const tokens = extractUsage(full) ?? estimateTokens(assistantText) + estimateTokens(userText);
+            await addUsage(user.id, tokens);
             if (needsTitle) {
               // beri jeda maksimal 5 dtk untuk judul yang hampir siap; kalau belum, biarkan
               const title = await Promise.race([titlePromise, sleep(5000).then(() => "")]);
@@ -219,6 +230,33 @@ export async function POST(req: Request) {
       "x-accel-buffering": "no",
     },
   });
+}
+
+
+/** `usage` dari event SSE (dikirim kalau gateway menyertakannya). null = tidak ada. */
+export function extractUsage(raw: string): number | null {
+  let total: number | null = null;
+  for (const line of raw.split("\n")) {
+    const s = line.trim();
+    if (!s.startsWith("data:")) continue;
+    const payload = s.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      const obj = JSON.parse(payload) as {
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+      const u = obj.usage;
+      if (!u) continue;
+      const sum =
+        typeof u.total_tokens === "number"
+          ? u.total_tokens
+          : (u.prompt_tokens ?? 0) + (u.completion_tokens ?? 0);
+      if (Number.isFinite(sum) && sum > 0) total = sum;
+    } catch {
+      /* potongan tidak utuh */
+    }
+  }
+  return total;
 }
 
 /** Ambil `delta.content` dari semua event SSE OpenAI-compatible. */

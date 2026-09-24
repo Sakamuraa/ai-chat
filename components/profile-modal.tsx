@@ -7,6 +7,7 @@ import { SignOut, X } from "@phosphor-icons/react";
 import { useI18n } from "./i18n";
 import { LANGS } from "@/lib/i18n";
 import { BrandMark } from "./sidebar";
+import { TOKEN_OPTIONS, DURATION_OPTIONS, formatTokens } from "@/lib/sub-options";
 
 export type Me = {
   id: string;
@@ -15,6 +16,7 @@ export type Me = {
   personality: string | null;
   memory_enabled: boolean;
   language: string;
+  is_admin: boolean;
 };
 
 function initials(name: string) {
@@ -40,6 +42,27 @@ export default function ProfileModal({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<"" | "saved" | "failed">("");
 
+  // langganan + kuota
+  const [quota, setQuota] = useState<{
+    dailyLimit: number;
+    remaining: number | null;
+    unlimited: boolean;
+    sub: { tokenLimit: number | null; remaining: number | null; validUntil: string; sourceCode: string | null } | null;
+  } | null>(null);
+  const [redeemCode, setRedeemCode] = useState("");
+  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pickToken, setPickToken] = useState<number | null>(TOKEN_OPTIONS[0].value);
+  const [pickHours, setPickHours] = useState<number>(DURATION_OPTIONS[0].hours);
+  const [newCode, setNewCode] = useState("");
+  const [codes, setCodes] = useState<{
+    code: string;
+    token_limit: number | null;
+    duration_hours: number;
+    revoked: boolean;
+    redeemed_at: string | null;
+    redeemer: string | null;
+  }[]>([]);
+
   // hash #settings = buka/tutup modal (tanpa route baru)
   useEffect(() => {
     const sync = () => setOpen(window.location.hash === "#settings");
@@ -55,6 +78,92 @@ export default function ProfileModal({
     setPersonality(me.personality ?? "");
     setMemory(me.memory_enabled);
   }, [me]);
+
+  const loadQuota = async () => {
+    try {
+      const res = await fetch("/api/subscriptions/me");
+      if (!res.ok) return;
+      const b = (await res.json()) as {
+        remaining: number | null;
+        unlimited: boolean;
+        dailyLimit: number;
+        sub: { tokenLimit: number | null; remaining: number | null; validUntil: string; sourceCode: string | null } | null;
+      };
+      setQuota({ dailyLimit: b.dailyLimit, remaining: b.remaining, unlimited: b.unlimited, sub: b.sub });
+    } catch {
+      /* diam */
+    }
+  };
+
+  const loadCodes = async () => {
+    try {
+      const res = await fetch("/api/subscriptions/codes");
+      if (!res.ok) return;
+      const b = (await res.json()) as { codes: typeof codes };
+      setCodes(b.codes);
+    } catch {
+      /* diam */
+    }
+  };
+
+  async function redeemSub() {
+    if (!redeemCode.trim() || busy) return;
+    setBusy(true);
+    setRedeemMsg(null);
+    try {
+      const res = await fetch("/api/subscriptions/redeem", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: redeemCode }),
+      });
+      if (res.ok) {
+        setRedeemCode("");
+        setRedeemMsg({ ok: true, text: t("sub.redeemOk") });
+        await loadQuota();
+        return;
+      }
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const map: Record<string, string> = {
+        not_found: t("sub.errNotFound"),
+        used: t("sub.errUsed"),
+        revoked: t("sub.errRevoked"),
+      };
+      setRedeemMsg({ ok: false, text: map[body.error ?? ""] ?? t("sub.errGeneric") });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createSubCode() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/subscriptions/codes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tokenLimit: pickToken, durationHours: pickHours }),
+      });
+      if (res.ok) {
+        const b = (await res.json()) as { code: string };
+        setNewCode(b.code);
+        await loadCodes();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeSubCode(code: string) {
+    await fetch(`/api/subscriptions/codes/${encodeURIComponent(code)}`, { method: "DELETE" });
+    await loadCodes();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    void loadQuota();
+    if (me?.is_admin) void loadCodes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, me?.is_admin]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && open && close();
@@ -210,6 +319,175 @@ export default function ProfileModal({
             </div>
           </div>
         </div>
+
+        {/* ===== Langganan: info + redeem (semua akun) ===== */}
+        <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-4">
+          <p className="text-sm font-medium">{t("sub.section")}</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            {t("sub.dailyQuota", { n: (quota?.dailyLimit ?? 10_000_000).toLocaleString("id-ID") })}
+          </p>
+
+          {quota?.sub ? (
+            <div className="mt-3 space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm">
+              <p className="font-medium text-[var(--fg)]">{t("sub.active")}</p>
+              <p className="text-xs text-[var(--muted)]">
+                {t("sub.tokens")}: <b>{formatTokens(quota.sub.tokenLimit)}</b>
+                {quota.sub.tokenLimit === null ? "" : ` · ${t("sub.remaining")}: ${formatTokens(quota.sub.remaining)}`}
+              </p>
+              <p className="text-xs text-[var(--muted)]">
+                {t("sub.validUntil")}: {new Date(quota.sub.validUntil).toLocaleString("id-ID")}
+              </p>
+              {quota.sub.sourceCode ? (
+                <p className="text-xs text-[var(--faint)]">
+                  {t("sub.source")}: {quota.sub.sourceCode}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.none")}</p>
+          )}
+
+          <label htmlFor="pf-code" className="mt-4 block text-[13px] font-medium">
+            {t("sub.redeemTitle")}
+          </label>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              id="pf-code"
+              value={redeemCode}
+              onChange={(e) => setRedeemCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void redeemSub()}
+              placeholder={t("sub.redeemPh")}
+              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 font-mono text-sm uppercase text-[var(--fg)] placeholder:font-sans placeholder:normal-case placeholder:text-[var(--muted)] focus:border-[var(--border-strong)]"
+            />
+            <button
+              onClick={() => void redeemSub()}
+              disabled={busy || !redeemCode.trim()}
+              className="shrink-0 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98] disabled:opacity-45"
+            >
+              {t("sub.redeemBtn")}
+            </button>
+          </div>
+          {redeemMsg ? (
+            <p className={`mt-2 text-xs ${redeemMsg.ok ? "text-[var(--muted)]" : "text-[var(--danger)]"}`}>
+              {redeemMsg.text}
+            </p>
+          ) : null}
+        </div>
+
+        {/* ===== Kelola kode: khusus admin (ujicoba) ===== */}
+        {me.is_admin ? (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-4">
+            <p className="text-sm font-medium">{t("sub.manage")}</p>
+
+            <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.tokenPick")}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {TOKEN_OPTIONS.map((o) => (
+                <button
+                  key={String(o.value)}
+                  onClick={() => setPickToken(o.value)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    pickToken === o.value
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--fg)]"
+                      : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.durPick")}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {DURATION_OPTIONS.map((o) => (
+                <button
+                  key={o.hours}
+                  onClick={() => setPickHours(o.hours)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    pickHours === o.hours
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--fg)]"
+                      : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                onClick={() => void createSubCode()}
+                disabled={busy}
+                className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98] disabled:opacity-45"
+              >
+                {t("sub.create")}
+              </button>
+              {newCode ? (
+                <span className="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 font-mono text-xs text-[var(--fg)]">
+                  <span className="truncate">{newCode}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(newCode);
+                    }}
+                    className="shrink-0 text-[var(--muted)] transition hover:text-[var(--fg)]"
+                    title={t("sub.copy")}
+                  >
+                    {t("sub.copy")}
+                  </button>
+                </span>
+              ) : null}
+            </div>
+
+            <p className="mt-4 text-xs text-[var(--muted)]">{t("sub.list")}</p>
+            <div className="mt-1.5 max-h-[190px] space-y-1.5 overflow-y-auto">
+              {codes.length === 0 ? (
+                <p className="text-xs text-[var(--faint)]">{t("sub.noneYet")}</p>
+              ) : (
+                codes.map((c) => {
+                  const dur = DURATION_OPTIONS.find((d) => d.hours === c.duration_hours);
+                  const state = c.revoked ? "revoked" : c.redeemed_at ? "used" : "unused";
+                  const label =
+                    state === "revoked"
+                      ? t("sub.stRevoked")
+                      : state === "used"
+                        ? t("sub.stUsed")
+                        : t("sub.stUnused");
+                  return (
+                    <div
+                      key={c.code}
+                      className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-mono text-[var(--fg)]">{c.code}</span>
+                      <span className="shrink-0 text-[var(--muted)]">
+                        {formatTokens(c.token_limit)} · {dur?.label ?? `${c.duration_hours}h`}
+                      </span>
+                      <span
+                        className={`shrink-0 ${
+                          state === "unused"
+                            ? "text-[#a16207] dark:text-[var(--accent)]"
+                            : state === "used"
+                              ? "text-[var(--muted)]"
+                              : "text-[var(--danger)]"
+                        }`}
+                      >
+                        {label}
+                        {c.redeemer ? ` · ${t("sub.usedBy", { name: c.redeemer })}` : ""}
+                      </span>
+                      {state === "unused" ? (
+                        <button
+                          onClick={() => void revokeSubCode(c.code)}
+                          className="shrink-0 text-[var(--faint)] transition hover:text-[var(--danger)]"
+                          title={t("sub.revoke")}
+                        >
+                          {t("sub.revoke")}
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-6 flex items-center gap-3">
           <button
