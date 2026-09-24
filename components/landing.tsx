@@ -3,36 +3,42 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Code, Lightning, Moon, Sun, TextAlignLeft } from "@phosphor-icons/react";
+import { ArrowUp, Code, Image as ImageIcon, Lightning, Moon, Paperclip, Sun, TextAlignLeft, X } from "@phosphor-icons/react";
 import { BrandMark } from "./sidebar";
-
-const DEFAULT_MODEL = "onheil-1.1-luna";
-
-const STARTERS = [
-  { icon: Lightning, label: "Jelaskan konsep dengan contoh singkat" },
-  { icon: Code, label: "Tulis kode untuk tugas saya" },
-  { icon: TextAlignLeft, label: "Ringkas teks panjang jadi poin" },
-];
+import ModelSelect, { MODELS } from "./model-select";
+import { useI18n } from "./i18n";
+import { classifyFile, MAX_MB, type Attachment } from "@/lib/attachments";
 
 export default function Landing({ username }: { username: string }) {
   const router = useRouter();
+  const { t, lang } = useI18n();
   const [text, setText] = useState("");
-  const [model, setModel] = useState(DEFAULT_MODEL);
-  const [models, setModels] = useState<{ id: string; label: string }[]>([]);
+  const [name, setName] = useState(username);
+  const [model, setModel] = useState<string>(MODELS[0].id);
   const [dark, setDark] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachMenu, setAttachMenu] = useState(false);
+  const [error, setError] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const imgRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/models")
-      .then((r) => (r.ok ? r.json() : { models: [] }))
-      .then((b: { models?: { id: string; label: string }[] }) => {
-        if (b.models?.length) {
-          setModels(b.models);
-          if (!b.models.some((m) => m.id === DEFAULT_MODEL)) setModel(b.models[0].id);
-        }
-      })
-      .catch(() => {});
     setDark(document.documentElement.classList.contains("dark"));
+  }, [lang]);
+
+  // nama ikut profil (basi kalau user ganti username tanpa reload)
+  useEffect(() => {
+    const sync = () =>
+      fetch("/api/me")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((b: { user?: { username?: string } } | null) => {
+          if (b?.user?.username) setName(b.user.username);
+        })
+        .catch(() => {});
+    sync();
+    window.addEventListener("profile-changed", sync);
+    return () => window.removeEventListener("profile-changed", sync);
   }, []);
 
   useEffect(() => {
@@ -48,12 +54,52 @@ export default function Landing({ username }: { username: string }) {
     document.documentElement.classList.toggle("dark", next);
   }
 
+  async function pickFiles(list: FileList | null) {
+    if (!list) return;
+    for (const file of Array.from(list)) {
+      if (file.size > MAX_MB * 1024 * 1024) {
+        setError(t("chat.attachTooBig", { mb: MAX_MB }));
+        continue;
+      }
+      const cls = classifyFile(file.name, file.type);
+      if (cls === "unsupported") {
+        setError(t("chat.attachUnsupported"));
+        continue;
+      }
+      setError("");
+      const data =
+        cls === "image"
+          ? await new Promise<string>((res, rej) => {
+              const r = new FileReader();
+              r.onload = () => res(String(r.result));
+              r.onerror = () => rej(r.error);
+              r.readAsDataURL(file);
+            })
+          : await file.text();
+      setAttachments((prev) =>
+        prev.length >= 6
+          ? prev
+          : [...prev, { name: file.name, kind: cls === "image" ? "image" : "text", mime: file.type || "text/plain", data }],
+      );
+    }
+  }
+
   function submit() {
     const content = text.trim();
-    if (!content) return;
-    sessionStorage.setItem("draft", JSON.stringify({ content, model }));
+    if (!content && attachments.length === 0) return;
+    // lampiran ikut lewat draft (base64/teks) supaya halaman /c/new langsung mengirim
+    sessionStorage.setItem(
+      "draft",
+      JSON.stringify({ content, model, attachments }),
+    );
     router.push("/c/new");
   }
+
+  const STARTERS = [
+    { icon: Lightning, key: "landing.starter1" },
+    { icon: Code, key: "landing.starter2" },
+    { icon: TextAlignLeft, key: "landing.starter3" },
+  ];
 
   return (
     <div className="flex flex-1 flex-col justify-center px-5 py-10 sm:px-8">
@@ -61,29 +107,47 @@ export default function Landing({ username }: { username: string }) {
         <div className="fade-up">
           <div className="mb-7 flex items-start justify-between gap-4">
             <div>
-              <div className="mb-5 flex items-center gap-2.5 sm:hidden">
+              <div className="mb-5 flex items-center gap-2.5 md:hidden">
                 <BrandMark size={22} />
-                <span className="text-sm font-semibold tracking-tight">AI</span>
+                <span className="text-sm font-semibold tracking-tight">OnheilAI</span>
               </div>
               <h1 className="text-[26px] font-semibold leading-[1.15] tracking-tight sm:text-[34px]">
-                Mau kerjakan apa,
-                <br className="hidden sm:block" /> {username}?
+                {t("landing.greeting", { name })}
               </h1>
-              <p className="mt-2.5 max-w-[52ch] text-[15px] text-[var(--muted)]">
-                Tulis di bawah untuk mulai. Setiap percakapan jadi sesi sendiri dan tersimpan.
-              </p>
+              <p className="mt-2.5 max-w-[52ch] text-[15px] text-[var(--muted)]">{t("landing.sub")}</p>
             </div>
             <button
               onClick={toggleTheme}
               className="mt-1 shrink-0 rounded-full border border-[var(--border)] p-2 text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--fg)]"
-              title={dark ? "Mode terang" : "Mode gelap"}
-              aria-label="Ganti tema"
+              title={dark ? t("landing.modeLight") : t("landing.modeDark")}
+              aria-label={dark ? t("landing.modeLight") : t("landing.modeDark")}
             >
               {dark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>
 
           <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus-within:border-[var(--border-strong)] focus-within:shadow-[0_2px_10px_rgba(0,0,0,0.06)]">
+            {attachments.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-2 px-1">
+                {attachments.map((a, i) => (
+                  <span
+                    key={`${a.name}-${i}`}
+                    className="flex max-w-[220px] items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--sidebar)] py-1 pl-2.5 pr-1 text-xs text-[var(--muted)]"
+                  >
+                    {a.kind === "image" ? <ImageIcon size={13} /> : <Paperclip size={13} />}
+                    <span className="truncate">{a.name}</span>
+                    <button
+                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      aria-label={t("chat.removeAttachment", { name: a.name })}
+                      className="rounded-full p-1 hover:text-[var(--danger)]"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
             <textarea
               ref={taRef}
               value={text}
@@ -95,47 +159,95 @@ export default function Landing({ username }: { username: string }) {
                 }
               }}
               rows={2}
-              placeholder="Tulis pesan…"
+              placeholder={t("landing.placeholder")}
               className="max-h-[200px] w-full resize-none bg-transparent px-2 py-2 text-[15px] leading-relaxed text-[var(--fg)] placeholder:text-[var(--muted)] focus:outline-none"
             />
-            <div className="mt-1 flex items-center gap-2 px-1">
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                aria-label="Pilih model"
-                className="max-w-[210px] truncate rounded-full border border-[var(--border)] bg-[var(--sidebar)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--fg)] focus:outline-none"
-              >
-                {(models.length ? models : [{ id: DEFAULT_MODEL, label: DEFAULT_MODEL }]).map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
 
-              <span className="hidden text-xs text-[var(--faint)] sm:inline">
-                Enter kirim, Shift+Enter baris baru
-              </span>
+            <div className="mt-1 flex items-center gap-2 px-1">
+              <div className="relative">
+                <button
+                  onClick={() => setAttachMenu((v) => !v)}
+                  aria-label={t("chat.attach")}
+                  title={t("chat.attach")}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--fg)]"
+                >
+                  <Paperclip size={15} />
+                </button>
+                {attachMenu ? (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setAttachMenu(false)} />
+                    <div className="fade-up absolute bottom-[calc(100%+8px)] left-0 z-30 w-[210px] rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)]">
+                      <button
+                        onClick={() => {
+                          setAttachMenu(false);
+                          imgRef.current?.click();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--muted)] transition hover:bg-[var(--border)]/60 hover:text-[var(--fg)]"
+                      >
+                        <ImageIcon size={15} /> Foto
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAttachMenu(false);
+                          docRef.current?.click();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--muted)] transition hover:bg-[var(--border)]/60 hover:text-[var(--fg)]"
+                      >
+                        <Paperclip size={15} /> Dokumen
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              <input
+                ref={imgRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  void pickFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <input
+                ref={docRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => {
+                  void pickFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+
+              <ModelSelect value={model} onChange={setModel} label={t("profile.model")} />
+
+              <span className="hidden text-xs text-[var(--faint)] sm:inline">{t("landing.enterHint")}</span>
 
               <button
                 onClick={submit}
-                disabled={!text.trim()}
-                aria-label="Kirim pesan"
+                disabled={!text.trim() && attachments.length === 0}
+                aria-label={t("chat.send")}
                 className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)] transition hover:brightness-95 active:scale-95 disabled:opacity-35"
               >
                 <ArrowUp size={17} weight="bold" />
               </button>
             </div>
+
+            {error ? <p className="mt-2 px-1 text-xs text-[var(--danger)]">{error}</p> : null}
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {STARTERS.map(({ icon: Icon, label }) => (
+            {STARTERS.map(({ icon: Icon, key }) => (
               <button
-                key={label}
-                onClick={() => setText(label)}
+                key={key}
+                onClick={() => setText(t(key))}
                 className="flex items-center gap-2 rounded-full border border-[var(--border)] px-3.5 py-2 text-[13px] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--fg)] active:scale-[0.98]"
               >
                 <Icon size={14} />
-                {label}
+                {t(key)}
               </button>
             ))}
           </div>

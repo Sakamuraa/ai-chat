@@ -1,0 +1,203 @@
+// language: TypeScript, file: lib/i18n.ts, target: dictionary ID/EN (tanpa library i18n)
+export type Lang = "id" | "en";
+
+export const LANGS: { code: Lang; label: string }[] = [
+  { code: "id", label: "Bahasa Indonesia" },
+  { code: "en", label: "English" },
+];
+
+type Dict = Record<string, string>;
+
+const id: Dict = {
+  "nav.newChat": "Chat baru",
+  "nav.search": "Cari sesi",
+  "nav.today": "Hari ini",
+  "nav.week": "7 hari terakhir",
+  "nav.older": "Lebih lama",
+  "nav.noSessions": "Belum ada sesi.",
+  "nav.noMatch": "Tidak ada sesi cocok.",
+  "nav.logout": "Keluar",
+  "nav.settings": "Pengaturan profil",
+  "nav.close": "Tutup sidebar",
+  "nav.open": "Buka sidebar",
+  "nav.loginPrompt": "Masuk untuk menyimpan sesi chat dan melanjutkannya kapan saja.",
+  "nav.login": "Masuk",
+  "nav.createAccount": "Buat akun",
+  "nav.deleteTitle": "Hapus sesi ini? Pesan di dalamnya ikut hilang.",
+  "nav.editTitle": "Ubah judul",
+
+  "landing.greeting": "Mau kerjakan apa, {name}?",
+  "landing.sub": "Tulis di bawah untuk mulai. Setiap percakapan jadi sesi sendiri dan tersimpan.",
+  "landing.placeholder": "Tulis pesan…",
+  "landing.enterHint": "Enter kirim, Shift+Enter baris baru",
+  "landing.starter1": "Jelaskan konsep dengan contoh singkat",
+  "landing.starter2": "Tulis kode untuk tugas saya",
+  "landing.starter3": "Ringkas teks panjang jadi poin",
+  "landing.modeDark": "Mode gelap",
+  "landing.modeLight": "Mode terang",
+
+  "chat.emptyTitle": "Mulai percakapan",
+  "chat.emptySub": "Pertanyaan pertama kamu membuat sesi ini tersimpan, lengkap dengan judulnya.",
+  "chat.placeholder": "Tulis pesan…",
+  "chat.send": "Kirim",
+  "chat.stop": "Berhenti",
+  "chat.copy": "Salin",
+  "chat.copied": "Tersalin",
+  "chat.regenerate": "Ulangi",
+  "chat.disclaimer": "OnheilAI can make mistakes. Check important info.",
+  "chat.sessionFailed": "Gagal membuat sesi.",
+  "chat.disconnected": "Koneksi terputus, coba lagi.",
+  "chat.thinking": "OnheilAI sedang berpikir",
+  "chat.hint1": "Membaca konteks percakapan…",
+  "chat.hint2": "Menyusun jawaban terbaik…",
+  "chat.hint3": "Memeriksa detail sebelum menjawab…",
+  "chat.hint4": "Merapikan kalimat…",
+  "chat.attach": "Tambah dokumen atau foto",
+  "chat.attachUnsupported": "Format ini belum didukung. Pakai gambar atau file teks.",
+  "chat.attachTooBig": "File terlalu besar, maksimal {mb} MB.",
+  "chat.removeAttachment": "Lampirkan {name}",
+  "chat.attached": "{n} lampiran",
+  "chat.notFoundTitle": "Sesi tidak ditemukan",
+  "chat.notFoundSub": "Sesi ini bukan milik kamu, sudah dihapus, atau tautannya salah.",
+
+  "auth.loginTitle": "Masuk ke OnheilAI",
+  "auth.loginSub": "Sesi chat kamu tersimpan di akun ini.",
+  "auth.registerTitle": "Buat akun OnheilAI",
+  "auth.registerSub": "Setiap akun punya sesi chat terpisah.",
+  "auth.username": "Username",
+  "auth.password": "Password",
+  "auth.passwordHint": "minimal 8 karakter",
+  "auth.usernamePh": "username",
+  "auth.passwordPh": "password",
+  "auth.login": "Masuk",
+  "auth.register": "Daftar",
+  "auth.processing": "Memproses…",
+  "auth.haveAccount": "Sudah punya akun?",
+  "auth.noAccount": "Belum punya akun?",
+  "auth.errTaken": "Username sudah dipakai.",
+  "auth.errCredentials": "Username atau password salah.",
+  "auth.errRate": "Terlalu banyak percobaan. Coba lagi dalam 10 menit.",
+  "auth.errGeneric": "Permintaan tidak valid.",
+
+  "profile.title": "Pengaturan profil",
+  "profile.username": "Username",
+  "profile.avatar": "Avatar",
+  "profile.avatarHint": "Tempel URL gambar. Kosongkan untuk memakai inisial.",
+  "profile.personality": "Kepribadian AI (opsional)",
+  "profile.personalityHint": "Instruksi gaya jawaban, misal: jawab singkat dan langsung.",
+  "profile.memory": "Ingat percakapan",
+  "profile.memoryDesc":
+    "Let OnheilAI personalize your experience based on your chats, files, and connected apps.",
+  "profile.language": "Bahasa / Language",
+  "profile.save": "Simpan",
+  "profile.saved": "Tersimpan",
+  "profile.failed": "Gagal menyimpan.",
+  "profile.close": "Tutup",
+  "profile.model": "Model",
+};
+
+const en: Dict = {
+  "nav.newChat": "New chat",
+  "nav.search": "Search chats",
+  "nav.today": "Today",
+  "nav.week": "Previous 7 days",
+  "nav.older": "Older",
+  "nav.noSessions": "No chats yet.",
+  "nav.noMatch": "No matching chats.",
+  "nav.logout": "Log out",
+  "nav.settings": "Profile settings",
+  "nav.close": "Close sidebar",
+  "nav.open": "Open sidebar",
+  "nav.loginPrompt": "Log in to save your chats and pick them up anywhere.",
+  "nav.login": "Log in",
+  "nav.createAccount": "Create account",
+  "nav.deleteTitle": "Delete this chat? Its messages go away too.",
+  "nav.editTitle": "Rename chat",
+
+  "landing.greeting": "What can I help with, {name}?",
+  "landing.sub": "Type below to start. Every conversation becomes its own saved chat.",
+  "landing.placeholder": "Message…",
+  "landing.enterHint": "Enter to send, Shift+Enter for a new line",
+  "landing.starter1": "Explain a concept with a short example",
+  "landing.starter2": "Write code for my task",
+  "landing.starter3": "Summarize long text into bullets",
+  "landing.modeDark": "Dark mode",
+  "landing.modeLight": "Light mode",
+
+  "chat.emptyTitle": "Start a conversation",
+  "chat.emptySub": "Your first message saves this chat, title included.",
+  "chat.placeholder": "Message…",
+  "chat.send": "Send",
+  "chat.stop": "Stop",
+  "chat.copy": "Copy",
+  "chat.copied": "Copied",
+  "chat.regenerate": "Retry",
+  "chat.disclaimer": "OnheilAI can make mistakes. Check important info.",
+  "chat.sessionFailed": "Could not create a chat.",
+  "chat.disconnected": "Connection dropped, try again.",
+  "chat.thinking": "OnheilAI is thinking",
+  "chat.hint1": "Reading the conversation…",
+  "chat.hint2": "Shaping the best answer…",
+  "chat.hint3": "Checking details before replying…",
+  "chat.hint4": "Tidying up the wording…",
+  "chat.attach": "Add a document or photo",
+  "chat.attachUnsupported": "Unsupported format. Use an image or a text file.",
+  "chat.attachTooBig": "File too large, max {mb} MB.",
+  "chat.removeAttachment": "Remove {name}",
+  "chat.attached": "{n} attachments",
+  "chat.notFoundTitle": "Chat not found",
+  "chat.notFoundSub": "This chat is not yours, was deleted, or the link is wrong.",
+
+  "auth.loginTitle": "Log in to OnheilAI",
+  "auth.loginSub": "Your chats are saved to this account.",
+  "auth.registerTitle": "Create an OnheilAI account",
+  "auth.registerSub": "Every account keeps its own chats.",
+  "auth.username": "Username",
+  "auth.password": "Password",
+  "auth.passwordHint": "at least 8 characters",
+  "auth.usernamePh": "username",
+  "auth.passwordPh": "password",
+  "auth.login": "Log in",
+  "auth.register": "Sign up",
+  "auth.processing": "Working…",
+  "auth.haveAccount": "Already have an account?",
+  "auth.noAccount": "No account yet?",
+  "auth.errTaken": "That username is taken.",
+  "auth.errCredentials": "Wrong username or password.",
+  "auth.errRate": "Too many attempts. Try again in 10 minutes.",
+  "auth.errGeneric": "Invalid request.",
+
+  "profile.title": "Profile settings",
+  "profile.username": "Username",
+  "profile.avatar": "Avatar",
+  "profile.avatarHint": "Paste an image URL. Leave empty to use your initials.",
+  "profile.personality": "AI personality (optional)",
+  "profile.personalityHint": "How it should answer, e.g. short and direct.",
+  "profile.memory": "Remember conversations",
+  "profile.memoryDesc":
+    "Let OnheilAI personalize your experience based on your chats, files, and connected apps.",
+  "profile.language": "Language / Bahasa",
+  "profile.save": "Save",
+  "profile.saved": "Saved",
+  "profile.failed": "Could not save.",
+  "profile.close": "Close",
+  "profile.model": "Model",
+};
+
+export const DICT: Record<Lang, Dict> = { id, en };
+
+/** Ganti {name} / {n} / {mb} di placeholder. Kunci hilang = kunci itu sendiri (tak pernah crash). */
+export function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
+  const raw = DICT[lang][key] ?? DICT.id[key] ?? key;
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? String(vars[k]) : `{${k}}`));
+}
+
+/** Kunci yang wajib ada di kedua bahasa — dipakai tes paritas. */
+export function missingKeys(): { id: string[]; en: string[] } {
+  const all = new Set([...Object.keys(id), ...Object.keys(en)]);
+  return {
+    id: [...all].filter((k) => !(k in id)),
+    en: [...all].filter((k) => !(k in en)),
+  };
+}

@@ -6,9 +6,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "@phosphor-icons/react";
 import { BrandMark } from "./sidebar";
+import { useI18n } from "./i18n";
 
 export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -28,16 +30,16 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
         const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
         setError(
           body.error === "username_taken"
-            ? "Username sudah dipakai."
+            ? t("auth.errTaken")
             : body.error === "invalid_credentials"
-              ? "Username atau password salah."
+              ? t("auth.errCredentials")
               : body.error === "too_many_attempts"
-                ? "Terlalu banyak percobaan. Coba lagi dalam 10 menit."
-                : (body.detail ?? "Permintaan tidak valid."),
+                ? t("auth.errRate")
+                : (body.detail ?? t("auth.errGeneric")),
         );
         return;
       }
-      window.dispatchEvent(new Event("sessions-changed")); // sidebar baca ulang status login
+      window.dispatchEvent(new Event("profile-changed"));
       router.replace("/");
       router.refresh();
     } finally {
@@ -55,18 +57,16 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       >
         <BrandMark size={28} />
         <h1 className="mt-5 text-[22px] font-semibold tracking-tight">
-          {isLogin ? "Masuk ke OnheilAI" : "Buat akun OnheilAI"}
+          {isLogin ? t("auth.loginTitle") : t("auth.registerTitle")}
         </h1>
         <p className="mt-1.5 text-sm text-[var(--muted)]">
-          {isLogin
-            ? "Sesi chat kamu tersimpan di akun ini."
-            : "Setiap akun punya sesi chat terpisah."}
+          {isLogin ? t("auth.loginSub") : t("auth.registerSub")}
         </p>
 
         <div className="mt-6 space-y-4">
           <div>
             <label htmlFor="username" className="mb-1.5 block text-[13px] font-medium">
-              Username
+              {t("auth.username")}
             </label>
             <input
               id="username"
@@ -74,13 +74,13 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] focus:border-[var(--border-strong)]"
-              placeholder="username"
+              placeholder={t("auth.usernamePh")}
             />
           </div>
 
           <div>
             <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium">
-              Password
+              {t("auth.password")}
             </label>
             <input
               id="password"
@@ -89,7 +89,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={isLogin ? "current-password" : "new-password"}
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] focus:border-[var(--border-strong)]"
-              placeholder={isLogin ? "password" : "minimal 8 karakter"}
+              placeholder={isLogin ? t("auth.passwordPh") : t("auth.passwordHint")}
             />
           </div>
         </div>
@@ -105,23 +105,29 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
           disabled={busy || !username || !password}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98] disabled:opacity-45"
         >
-          {busy ? "Memproses…" : isLogin ? "Masuk" : "Daftar"}
+          {busy ? t("auth.processing") : isLogin ? t("auth.login") : t("auth.register")}
           {!busy ? <ArrowRight size={15} weight="bold" /> : null}
         </button>
 
         <p className="mt-5 text-center text-sm text-[var(--muted)]">
           {isLogin ? (
             <>
-              Belum punya akun?{" "}
-              <Link href="/register" className="font-medium text-[#a16207] underline underline-offset-4 dark:text-[var(--accent)]">
-                Daftar
+              {t("auth.noAccount")}{" "}
+              <Link
+                href="/register"
+                className="font-medium text-[#a16207] underline underline-offset-4 dark:text-[var(--accent)]"
+              >
+                {t("auth.register")}
               </Link>
             </>
           ) : (
             <>
-              Sudah punya akun?{" "}
-              <Link href="/login" className="font-medium text-[#a16207] underline underline-offset-4 dark:text-[var(--accent)]">
-                Masuk
+              {t("auth.haveAccount")}{" "}
+              <Link
+                href="/login"
+                className="font-medium text-[#a16207] underline underline-offset-4 dark:text-[var(--accent)]"
+              >
+                {t("auth.login")}
               </Link>
             </>
           )}

@@ -6,16 +6,30 @@ import { getSessionUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+export type SessionRow = {
+  id: string;
+  title: string;
+  model: string;
+  created_at: string;
+  updated_at: string;
+  preview: string | null;
+};
+
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  // preview = pesan user pertama; dipakai sidebar saat judul masih 'New chat'
   const rows = (await db()`
-    SELECT id, title, model, created_at, updated_at
-    FROM sessions WHERE user_id = ${user.id}
-    ORDER BY updated_at DESC
+    SELECT s.id, s.title, s.model, s.created_at, s.updated_at,
+      (SELECT left(m.content, 90) FROM messages m
+        WHERE m.session_id = s.id AND m.role = 'user'
+        ORDER BY m.created_at ASC, m.id ASC LIMIT 1) AS preview
+    FROM sessions s
+    WHERE s.user_id = ${user.id}
+    ORDER BY s.updated_at DESC
     LIMIT 200
-  `) as unknown as { id: string; title: string; model: string; created_at: string; updated_at: string }[];
+  `) as unknown as SessionRow[];
 
   return NextResponse.json({ sessions: rows });
 }
@@ -31,8 +45,8 @@ export async function POST(req: Request) {
 
   const rows = (await db()`
     INSERT INTO sessions (user_id, model) VALUES (${user.id}, ${parsed.data.model})
-    RETURNING id, title, model, created_at, updated_at
-  `) as unknown as { id: string; title: string; model: string }[];
+    RETURNING id, title, model, created_at, updated_at, NULL::text AS preview
+  `) as unknown as SessionRow[];
 
   return NextResponse.json({ session: rows[0] }, { status: 201 });
 }

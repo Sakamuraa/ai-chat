@@ -3,6 +3,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import AppChrome from "@/components/app-chrome";
 import Sidebar from "@/components/sidebar";
 
 const sans = Geist({
@@ -41,10 +42,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="font-sans antialiased">
-        <div className="flex h-dvh w-full overflow-hidden">
-          <Sidebar />
-          <main className="relative flex min-w-0 flex-1 flex-col">{children}</main>
-        </div>
+        <AppChrome>
+          <div className="flex h-dvh w-full overflow-hidden">
+            <Sidebar />
+            <main className="relative flex min-w-0 flex-1 flex-col">{children}</main>
+          </div>
+        </AppChrome>
       </body>
     </html>
   );
