@@ -306,6 +306,10 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
 
     // riwayat dikirim: untuk edit, potong tampilan sampai pesan itu
     let sentBase: Msg[] = messages;
+    // id pesan ASLI sebelum diganti — sentBase[editIndex] nanti berisi objek baru tanpa id,
+    // kalau tidak disimpan di sini editMessageId terkirim undefined dan server
+    // menganggapnya chat baru (prompt lama tidak hilang, yang baru menempel di bawah)
+    const editedId = opts.editIndex !== undefined ? messages[opts.editIndex]?.id : undefined;
     if (opts.editIndex !== undefined) {
       sentBase = [...messages.slice(0, opts.editIndex), { role: "user", content, attachments: files }];
       historyRef.current = sentBase.filter((m) => m.role === "user").map((m) => m.content);
@@ -328,7 +332,7 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
       model: mdl,
       content,
       regenerate: opts.regenerate || undefined,
-      editMessageId: opts.editIndex !== undefined ? sentBase[opts.editIndex]?.id : undefined,
+      editMessageId: editedId,
       attachments: files.length > 0 ? files : undefined,
     });
     if (acc) setMessages((prev) => [...prev, { role: "assistant", content: acc }]);
