@@ -51,14 +51,16 @@ export default function ModelSelect({
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    // pointerdown menutup lebih andal di sentuhan (mousedown kadang datang terlambat di mobile)
+    const onDoc = (e: Event) => {
+      const node = e.target as Node | null;
+      if (box.current && node && !box.current.contains(node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc, true);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("pointerdown", onDoc, true);
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
@@ -81,7 +83,7 @@ export default function ModelSelect({
       {open ? (
         <div
           role="listbox"
-          className={`fade-up absolute right-0 z-30 w-[248px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)] ${
+          className={`fade-up absolute right-0 z-50 max-h-[60dvh] w-[262px] overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)] [touch-action:manipulation] ${
             direction === "up" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"
           }`}
         >

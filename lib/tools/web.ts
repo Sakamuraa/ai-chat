@@ -95,6 +95,46 @@ async function searchBing(q: string, n: number): Promise<Item[]> {
 }
 
 /** Mesin 2/3: DuckDuckGo html + lite — dilewati kalau kena halaman anomali. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+/** Bing lewat RSS — tidak kena blokir browser-check seperti HTML-nya. */
+async function searchBingRss(q: string, n: number): Promise<Item[]> {
+  const url = `https://www.bing.com/search?format=rss&q=${encodeURIComponent(q)}`;
+  const res = await fetch(url, {
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      accept: "application/rss+xml,application/xml,text/xml,*/*",
+    },
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!res.ok) throw new Error(`bing-rss ${res.status}`);
+  const xml = await res.text();
+  const items: Item[] = [];
+  const blocks = xml.split("<item>").slice(1);
+  for (const b of blocks) {
+    const title = (b.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "").trim();
+    const link = (b.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? "").trim();
+    const desc = (b.match(/<description>([\s\S]*?)<\/description>/)?.[1] ?? "").trim();
+    if (!title || !link.startsWith("http")) continue;
+    const host = (() => { try { return new URL(link).hostname; } catch { return ""; } })();
+    if (/bing\.com|microsoft\.com|go\.microsoft/i.test(host)) continue;
+    items.push({ title: decodeEntities(title), url: link, snippet: decodeEntities(desc.slice(0, 300)) });
+    if (items.length >= n) break;
+  }
+  if (items.length === 0) throw new Error("bing-rss: kosong");
+  return items;
+}
+
 async function searchDdg(q: string, n: number): Promise<Item[]> {
   const clean = (href: string): string => {
     let h = href;
@@ -175,6 +215,7 @@ const search: ToolDef = {
     // rantai: Bing (stabil) -> DuckDuckGo (html, lalu lite) -> Wikipedia
     const engines: { name: string; run: () => Promise<Item[]> }[] = [
       { name: "bing", run: () => searchBing(q, n) },
+      { name: "bing-rss", run: () => searchBingRss(q, n) },
       { name: "ddg", run: () => searchDdg(q, n) },
       { name: "wikipedia", run: () => searchWikipedia(q, n) },
     ];

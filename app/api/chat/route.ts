@@ -33,13 +33,10 @@ const Body = z.object({
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Teks file disematkan inline supaya replay riwayat tetap utuh tanpa menyimpan biner. */
-function withTextAttachments(text: string, files: z.infer<typeof Attachment>[]): string {
-  const docs = files.filter((f) => f.kind === "text");
-  if (docs.length === 0) return text;
-  const blocks = docs
-    .map((f) => `Lampiran "${f.name}" (${f.mime}):\n\`\`\`\n${f.data.slice(0, 12_000)}\n\`\`\``)
-    .join("\n\n");
-  return `${text}\n\n---\n\n${blocks}`;
+function withTextAttachments(text: string, _files: z.infer<typeof Attachment>[]): string {
+  // Permintaan Manuel: dokumen TIDAK ditempel ke prompt — preview lampiran sudah ada di UI,
+  // dan isi berkas (mis. .json berisi token) tidak boleh ikut dikirim ke model.
+  return text;
 }
 
 /** Konteks sistem: kepribadian + memori (opsional, dari profil user). */
@@ -200,9 +197,12 @@ export async function POST(req: Request) {
   const visionImages = oversize > 0 ? images.filter((i) => i.data.length <= MAX_IMAGE_CHARS) : images;
   if (oversize > 0) content = `${content}\n\n[catatan: ${oversize} gambar dilewati karena terlalu besar]`;
   if (visionImages.length > 0) {
+    // sebagian unggahan mengirim base64 polos tanpa prefix -> upstream membacanya sebagai URL/rusak
+    const toDataUri = (a: { data: string; mime: string }): string =>
+      a.data.startsWith("data:") ? a.data : `data:${a.mime || "image/jpeg"};base64,${a.data.replace(/^base64,/, "")}`;
     const parts: ChatPart[] = [
       { type: "text", text: content },
-      ...visionImages.map((i) => ({ type: "image_url" as const, image_url: { url: i.data } })),
+      ...visionImages.map((i) => ({ type: "image_url" as const, image_url: { url: toDataUri(i) } })),
     ];
     for (let i = turns.length - 1; i >= 0; i--) {
       if (turns[i].role === "user") {
