@@ -3,12 +3,15 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import ShareView from "@/components/share-view";
 import type { Msg } from "@/components/chat-view";
+import { isUuid } from "@/lib/uuid";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default async function SharePage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
+  // bukan uuid (mis. /s/new) -> 404, jangan biarkan Postgres melempar 22P02 -> 500
+  if (!isUuid(sessionId)) notFound();
 
   // hanya sesi yang sengaja dibagikan oleh pemiliknya yang tampil
   const sessions = (await db()`

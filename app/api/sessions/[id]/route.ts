@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { isUuid } from "@/lib/uuid";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   const sessions = (await db()`
     SELECT id, title, model, created_at, updated_at, share_enabled
@@ -52,6 +54,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   const parsed = Patch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid_body" }, { status: 400 });
@@ -73,6 +76,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   const rows = (await db()`
     DELETE FROM sessions WHERE id = ${id} AND user_id = ${user.id} RETURNING id

@@ -334,6 +334,20 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
       router.refresh();
     }
     window.dispatchEvent(new Event("sessions-changed"));
+
+    // ambil ulang pesan dari server: pesan yang baru dibuat tidak punya id di sisi klien,
+    // padahal tombol "Ubah" & lampiran permanen bergantung pada id
+    try {
+      const res = await fetch(`/api/sessions/${sid}`);
+      if (res.ok) {
+        const body = (await res.json()) as {
+          messages: { id: string; role: Msg["role"]; content: string; attachments?: Attachment[] | null }[];
+        };
+        setMessages(body.messages.map((m) => ({ ...m, attachments: m.attachments ?? [] })));
+      }
+    } catch {
+      /* tampilan lokal sudah cukup */
+    }
   }
 
   async function toggleShare() {
