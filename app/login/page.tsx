@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import AuthForm from "@/components/auth-form";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Masuk — AI" };
+export const metadata = { title: "Masuk" };
 
 export default async function LoginPage() {
   const user = await getSessionUser();

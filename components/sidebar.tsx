@@ -4,6 +4,16 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  ChatsCircle,
+  MagnifyingGlass,
+  PencilSimple,
+  Plus,
+  SignOut,
+  Sparkle,
+  Trash,
+  X,
+} from "@phosphor-icons/react";
 
 type Session = { id: string; title: string; model: string; updated_at: string };
 
@@ -11,9 +21,9 @@ function group(sessions: Session[]) {
   const now = Date.now();
   const day = 86_400_000;
   const out: { label: string; items: Session[] }[] = [
-    { label: "Today", items: [] },
-    { label: "Previous 7 days", items: [] },
-    { label: "Older", items: [] },
+    { label: "Hari ini", items: [] },
+    { label: "7 hari terakhir", items: [] },
+    { label: "Lebih lama", items: [] },
   ];
   for (const s of sessions) {
     const age = now - new Date(s.updated_at).getTime();
@@ -24,6 +34,18 @@ function group(sessions: Session[]) {
   return out.filter((g) => g.items.length > 0);
 }
 
+export function BrandMark({ size = 24 }: { size?: number }) {
+  return (
+    <span
+      className="flex items-center justify-center rounded-[10px] bg-[var(--accent)] text-[var(--accent-fg)]"
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      <Sparkle weight="fill" size={size * 0.58} />
+    </span>
+  );
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -32,6 +54,7 @@ export default function Sidebar() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -39,8 +62,9 @@ export default function Sidebar() {
       if (!res.ok) return;
       const body = (await res.json()) as { sessions: Session[] };
       setSessions(body.sessions);
+      setLoaded(true);
     } catch {
-      /* diam — sidebar tidak boleh merusak halaman */
+      /* sidebar tidak boleh merusak halaman */
     }
   }, []);
 
@@ -66,7 +90,9 @@ export default function Sidebar() {
       body: JSON.stringify({ title }),
     });
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title } : s)));
-    if (id === activeId) window.dispatchEvent(new CustomEvent("session-title-changed", { detail: title }));
+    if (id === activeId) {
+      window.dispatchEvent(new CustomEvent("session-title-changed", { detail: title }));
+    }
   }
 
   async function remove(id: string) {
@@ -86,45 +112,64 @@ export default function Sidebar() {
   }
 
   const panel = (
-    <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
-      <div className="flex items-center gap-2 px-3 py-3">
-        <Link href="/" className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-black/5 dark:hover:bg-white/10">
-          <span className="h-6 w-6 rounded-md bg-[#facc15]" />
-          <span className="text-sm font-semibold">AI</span>
+    <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
+      <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="Beranda">
+          <BrandMark />
+          <span className="text-[15px] font-semibold tracking-tight">AI</span>
         </Link>
         <button
           onClick={() => setOpen(false)}
-          className="ml-auto rounded-md px-2 py-1 text-xs text-[var(--muted)] hover:bg-black/5 md:hidden"
+          className="ml-auto rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--border)] hover:text-[var(--fg)] md:hidden"
+          aria-label="Tutup menu"
         >
-          ✕
+          <X size={16} weight="bold" />
         </button>
       </div>
 
       <div className="px-3 pb-2">
         <Link
           href="/"
-          className="flex w-full items-center gap-2 rounded-lg bg-[#facc15] px-3 py-2 text-sm font-semibold text-black transition hover:brightness-95"
+          onClick={() => setOpen(false)}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98]"
         >
-          <span className="text-base leading-none">＋</span> Chat baru
+          <Plus size={16} weight="bold" />
+          Chat baru
         </Link>
       </div>
 
-      <div className="px-3 pb-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cari sesi…"
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-sm outline-none focus:border-[#facc15]"
-        />
+      <div className="px-3 pb-3">
+        <div className="relative">
+          <MagnifyingGlass
+            size={15}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--faint)]"
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari sesi"
+            aria-label="Cari sesi"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--panel)] py-2 pl-9 pr-3 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] focus:border-[var(--border-strong)]"
+          />
+        </div>
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {filtered.length === 0 ? (
-          <p className="px-2 py-4 text-xs text-[var(--muted)]">Belum ada sesi.</p>
+        {!loaded ? (
+          <div className="space-y-2 px-2 pt-1">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-7 rounded-xl bg-[var(--border)]/60" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-start gap-1.5 px-3 py-6 text-[var(--muted)]">
+            <ChatsCircle size={20} weight="light" />
+            <p className="text-sm">{query ? "Tidak ada sesi cocok." : "Belum ada sesi."}</p>
+          </div>
         ) : (
           group(filtered).map((g) => (
-            <div key={g.label} className="mb-3">
-              <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+            <div key={g.label} className="mb-4">
+              <p className="px-3 pb-1.5 pt-1 text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--faint)]">
                 {g.label}
               </p>
               {g.items.map((s) =>
@@ -139,19 +184,21 @@ export default function Sidebar() {
                       if (e.key === "Enter") rename(s.id);
                       if (e.key === "Escape") setEditing(null);
                     }}
-                    className="mb-0.5 w-full rounded-md border border-[#facc15] bg-[var(--bg)] px-2 py-1.5 text-sm outline-none"
+                    className="mb-1 w-full rounded-xl border border-[var(--accent)] bg-[var(--panel)] px-3 py-1.5 text-sm outline-none"
                   />
                 ) : (
                   <div
                     key={s.id}
-                    className={`group mb-0.5 flex items-center gap-1 rounded-md px-2 py-1.5 text-sm ${
-                      s.id === activeId ? "bg-black/10 dark:bg-white/10" : "hover:bg-black/5 dark:hover:bg-white/5"
+                    className={`group mb-1 flex items-center gap-1 rounded-xl px-3 py-2 transition ${
+                      s.id === activeId
+                        ? "bg-[var(--border)]/70"
+                        : "hover:bg-[var(--border)]/45"
                     }`}
                   >
                     <Link
                       href={`/c/${s.id}`}
                       onClick={() => setOpen(false)}
-                      className="min-w-0 flex-1 truncate"
+                      className="min-w-0 flex-1 truncate text-sm text-[var(--fg)]"
                       title={s.title}
                       onDoubleClick={(e) => {
                         e.preventDefault();
@@ -167,16 +214,18 @@ export default function Sidebar() {
                         setDraft(s.title);
                       }}
                       title="Ubah judul"
-                      className="hidden rounded px-1 text-xs text-[var(--muted)] hover:text-[var(--fg)] group-hover:block"
+                      aria-label={`Ubah judul ${s.title}`}
+                      className="rounded-full p-1 text-[var(--faint)] opacity-0 transition hover:bg-[var(--panel)] hover:text-[var(--fg)] focus-visible:opacity-100 group-hover:opacity-100"
                     >
-                      ✎
+                      <PencilSimple size={14} />
                     </button>
                     <button
                       onClick={() => remove(s.id)}
                       title="Hapus sesi"
-                      className="hidden rounded px-1 text-xs text-[var(--muted)] hover:text-red-500 group-hover:block"
+                      aria-label={`Hapus sesi ${s.title}`}
+                      className="rounded-full p-1 text-[var(--faint)] opacity-0 transition hover:bg-[var(--panel)] hover:text-[var(--danger)] focus-visible:opacity-100 group-hover:opacity-100"
                     >
-                      🗑
+                      <Trash size={14} />
                     </button>
                   </div>
                 ),
@@ -186,11 +235,12 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="border-t border-[var(--border)] px-3 py-2.5">
+      <div className="border-t border-[var(--border)] px-3 py-3">
         <button
           onClick={logout}
-          className="w-full rounded-md px-2 py-1.5 text-left text-sm text-[var(--muted)] hover:bg-black/5 dark:hover:bg-white/5"
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--border)]/60 hover:text-[var(--fg)]"
         >
+          <SignOut size={15} />
           Keluar
         </button>
       </div>
@@ -199,22 +249,19 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* desktop */}
       <div className="hidden md:block">{panel}</div>
 
-      {/* mobile trigger */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed left-3 top-3 z-30 rounded-md border border-[var(--border)] bg-[var(--sidebar)] px-2.5 py-1.5 text-sm md:hidden"
-        aria-label="Buka menu sesi"
+        className="fixed left-3 top-3 z-30 rounded-full border border-[var(--border)] bg-[var(--panel)] p-2 text-[var(--muted)] shadow-sm transition hover:text-[var(--fg)] md:hidden"
+        aria-label="Buka daftar sesi"
       >
-        ☰
+        <ChatsCircle size={17} />
       </button>
 
-      {/* mobile drawer */}
       {open ? (
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-black/45" />
           <div className="absolute inset-y-0 left-0" onClick={(e) => e.stopPropagation()}>
             {panel}
           </div>

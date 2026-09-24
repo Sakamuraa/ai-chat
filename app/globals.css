@@ -1,30 +1,72 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── TOKEN ────────────────────────────────────────────────────
+   SKALA RADIUS (satu sistem, jangan dicampur):
+     kartu / panel / input / bubble user = 12px  (--r)
+     chip / tombol aksi / send           = pill   (999px)
+     mark brand                          = 10px
+     code inline                         = 6px
+   CATATAN: root html harus tetap 16px supaya rem akurat (rounded-xl = 12px persis).
+   SATU aksen: #facc15, teks di atasnya selalu #18181b (kontras 12.9:1).
+   Netral: zinc family (dingin), jangan digabung abu hangat. */
+
 :root {
-  --bg: #ffffff;
-  --sidebar: #f7f7f8;
-  --border: #e5e5e7;
-  --fg: #0d0d0d;
-  --muted: #5f5f5f;
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --sidebar: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --fg: #18181b;
+  --muted: #71717a;
+  --faint: #a1a1aa;
+  --accent: #facc15;
+  --accent-fg: #18181b;
+  --accent-soft: rgba(250, 204, 21, 0.14);
+  --ring: rgba(250, 204, 21, 0.75);
+  --danger: #dc2626;
+  --r: 12px;
+  --code-bg: #101013;
 }
 
 .dark {
-  --bg: #212121;
-  --sidebar: #171717;
-  --border: #2f2f2f;
-  --fg: #ececec;
-  --muted: #a8a8a8;
+  --bg: #131316;
+  --panel: #1b1b1f;
+  --sidebar: #0e0e10;
+  --border: #27272b;
+  --border-strong: #3a3a40;
+  --fg: #ededf0;
+  --muted: #a1a1aa;
+  --faint: #71717a;
+  --accent-soft: rgba(250, 204, 21, 0.16);
+  --code-bg: #0b0b0d;
 }
 
 html,
 body {
   height: 100%;
+}
+body {
   background: var(--bg);
   color: var(--fg);
+  font-size: 15px; /* teks body; root html sengaja dibiarkan 16px supaya rem akurat */
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 ::-webkit-scrollbar {
@@ -32,47 +74,82 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--muted) 35%, transparent);
-  border-radius: 8px;
-  border: 2px solid transparent;
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+  border: 3px solid transparent;
   background-clip: content-box;
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* markdown thread */
+/* ── MOTION (MOTION_INTENSITY 4: transisi state, bukan hiburan) ────── */
+.fade-up {
+  animation: fade-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.caret {
+  display: inline-block;
+  width: 8px;
+  height: 17px;
+  margin-left: 2px;
+  vertical-align: -3px;
+  background: var(--accent);
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .caret {
+    animation: none;
+  }
+}
+
+/* ── THREAD MARKDOWN ──────────────────────────────────────────────── */
 .md {
-  font-size: 16px;
-  line-height: 1.75;
+  font-size: 15.5px;
+  line-height: 1.72;
   word-break: break-word;
 }
-.md p {
-  margin: 0 0 12px;
+.md > *:first-child {
+  margin-top: 0;
 }
-.md p:last-child {
+.md > *:last-child {
   margin-bottom: 0;
+}
+.md p {
+  margin: 0 0 14px;
 }
 .md h1,
 .md h2,
 .md h3 {
-  margin: 20px 0 10px;
-  font-weight: 650;
+  margin: 26px 0 10px;
+  font-weight: 620;
+  letter-spacing: -0.015em;
   line-height: 1.3;
 }
 .md h1 {
-  font-size: 1.4em;
+  font-size: 1.42em;
 }
 .md h2 {
-  font-size: 1.25em;
+  font-size: 1.24em;
 }
 .md h3 {
-  font-size: 1.1em;
+  font-size: 1.08em;
 }
 .md ul,
 .md ol {
-  margin: 0 0 12px;
-  padding-left: 1.4em;
+  margin: 0 0 14px;
+  padding-left: 1.35em;
 }
 .md ul {
   list-style: disc;
@@ -81,60 +158,69 @@ body {
   list-style: decimal;
 }
 .md li {
-  margin: 4px 0;
+  margin: 5px 0;
+}
+.md li::marker {
+  color: var(--faint);
 }
 .md a {
-  color: #ca8a04;
+  color: #a16207;
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
 }
 .dark .md a {
-  color: #facc15;
+  color: var(--accent);
 }
 .md code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.875em;
+  font-family: var(--font-mono);
+  font-size: 0.86em;
   background: color-mix(in srgb, var(--muted) 16%, transparent);
-  padding: 2px 5px;
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 6px;
 }
 .md pre {
-  margin: 14px 0;
-  padding: 14px;
-  border-radius: 10px;
-  background: #0d0d0d;
-  overflow-x: auto;
+  position: relative;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: var(--r);
+  background: var(--code-bg);
   border: 1px solid var(--border);
+  overflow-x: auto;
 }
 .md pre code {
   background: transparent;
+  border: 0;
   padding: 0;
-  color: #e6e6e6;
-  font-size: 13.5px;
-  line-height: 1.6;
+  color: #e6e6ea;
+  font-size: 13px;
+  line-height: 1.65;
 }
 .md blockquote {
-  margin: 12px 0;
-  padding-left: 14px;
-  border-left: 3px solid #facc15;
+  margin: 14px 0;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--accent);
   color: var(--muted);
 }
 .md table {
   border-collapse: collapse;
-  margin: 12px 0;
+  margin: 16px 0;
   width: 100%;
+  font-size: 0.94em;
 }
 .md th,
 .md td {
   border: 1px solid var(--border);
-  padding: 7px 10px;
+  padding: 8px 11px;
   text-align: left;
 }
 .md th {
-  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  background: color-mix(in srgb, var(--muted) 9%, transparent);
+  font-weight: 600;
 }
 .md hr {
   border: 0;
   border-top: 1px solid var(--border);
-  margin: 18px 0;
+  margin: 22px 0;
 }

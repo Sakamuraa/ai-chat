@@ -3,7 +3,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ArrowsClockwise,
+  ArrowUp,
+  Copy,
+  PencilSimple,
+  Prohibit,
+} from "@phosphor-icons/react";
 import Markdown from "./markdown";
+import { BrandMark } from "./sidebar";
 
 export type Msg = { id?: string; role: "user" | "assistant"; content: string };
 
@@ -34,11 +42,11 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
   const bottomRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
-  // judul yang tampil di tab: judul sesi, atau preview pesan pertama
-  const displayTitle = heading === "New chat" ? (messages.find((m) => m.role === "user")?.content.slice(0, 60) ?? "New chat") : heading;
+  const firstUser = messages.find((m) => m.role === "user")?.content.slice(0, 60);
+  const displayTitle = heading === "New chat" ? (firstUser ?? "Chat baru") : heading;
 
   useEffect(() => {
-    document.title = `${displayTitle} — AI`;
+    document.title = `${displayTitle} · AI`;
   }, [displayTitle]);
 
   useEffect(() => {
@@ -68,10 +76,10 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 240)}px`;
+    ta.style.height = `${Math.min(ta.scrollHeight, 220)}px`;
   }, [input]);
 
-  // draft dari landing page (chat pertama)
+  // draft dari halaman awal (chat pertama)
   useEffect(() => {
     const raw = sessionStorage.getItem("draft");
     if (!raw || streaming) return;
@@ -81,7 +89,7 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
       if (d.model) setCurrentModel(d.model);
       void send(d.content, d.model || currentModel);
     } catch {
-      /* draft rusak — abaikan */
+      /* draft rusak */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -131,7 +139,7 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
               setStreamText(acc);
             }
           } catch {
-            /* potongan tidak utuh — lewati */
+            /* potongan tidak utuh */
           }
         }
       }
@@ -151,7 +159,7 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
         setMessages((prev) => [...prev, { role: "assistant", content: acc }]);
       }
     } catch (e) {
-      if ((e as Error).name !== "AbortError") setError("Koneksi terputus — coba lagi.");
+      if ((e as Error).name !== "AbortError") setError("Koneksi terputus, coba lagi.");
     } finally {
       setStreamText("");
       setStreaming(false);
@@ -218,9 +226,8 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* topbar */}
-      <header className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 pl-12 md:pl-4">
-        <div className="min-w-0 flex-1">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-3 backdrop-blur-md sm:px-5">
+        <div className="min-w-0 flex-1 pl-9 sm:pl-0">
           {editingTitle ? (
             <input
               autoFocus
@@ -231,7 +238,7 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
                 if (e.key === "Enter") saveTitle();
                 if (e.key === "Escape") setEditingTitle(false);
               }}
-              className="w-full max-w-md rounded-md border border-[#facc15] bg-transparent px-2 py-1 text-sm outline-none"
+              className="w-full max-w-md rounded-xl border border-[var(--accent)] bg-[var(--panel)] px-3 py-1.5 text-sm outline-none"
             />
           ) : (
             <button
@@ -239,10 +246,14 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
                 setTitleDraft(heading);
                 setEditingTitle(true);
               }}
-              className="max-w-full truncate rounded-md px-2 py-1 text-left text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5"
-              title="Klik untuk ubah judul"
+              className="group flex max-w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left transition hover:bg-[var(--border)]/50"
+              title="Ubah judul sesi"
             >
-              {displayTitle}
+              <span className="truncate text-sm font-medium tracking-tight">{displayTitle}</span>
+              <PencilSimple
+                size={13}
+                className="shrink-0 text-[var(--faint)] opacity-0 transition group-hover:opacity-100"
+              />
             </button>
           )}
         </div>
@@ -250,7 +261,8 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
         <select
           value={currentModel}
           onChange={(e) => setCurrentModel(e.target.value)}
-          className="max-w-[180px] truncate rounded-lg border border-[var(--border)] bg-[var(--sidebar)] px-2 py-1.5 text-xs outline-none focus:border-[#facc15]"
+          aria-label="Pilih model"
+          className="max-w-[170px] truncate rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--fg)] focus:outline-none"
         >
           {(models.length ? models : [{ id: currentModel, label: currentModel }]).map((m) => (
             <option key={m.id} value={m.id}>
@@ -260,40 +272,54 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
         </select>
       </header>
 
-      {/* thread */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {empty ? (
-          <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center gap-2 px-4 text-center">
-            <span className="h-9 w-9 rounded-lg bg-[#facc15]" />
-            <h2 className="text-xl font-semibold">Mulai percakapan</h2>
-            <p className="text-sm text-[var(--muted)]">Ketik pesan di bawah — sesi dibuat otomatis.</p>
+          <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-5 py-10 sm:px-8">
+            <div className="fade-up">
+              <BrandMark size={30} />
+              <h2 className="mt-5 text-[24px] font-semibold tracking-tight sm:text-[30px]">
+                Mulai percakapan
+              </h2>
+              <p className="mt-2 max-w-[46ch] text-[15px] text-[var(--muted)]">
+                Pertanyaan pertama kamu membuat sesi ini tersimpan, lengkap dengan judulnya.
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-3xl px-4 py-6">
+          <div className="mx-auto w-full max-w-3xl px-5 py-7 sm:px-8">
             {messages.map((m, i) => (
-              <div key={m.id ?? i} className={`mb-6 ${m.role === "user" ? "flex justify-end" : ""}`}>
+              <div key={m.id ?? i} className="mb-7">
                 {m.role === "user" ? (
-                  <div className="max-w-[85%] rounded-3xl border border-[#facc15]/40 bg-[#facc15]/10 px-4 py-2.5 text-[15px] whitespace-pre-wrap">
-                    {m.content}
+                  <div className="flex justify-end">
+                    <div className="max-w-[86%] whitespace-pre-wrap rounded-xl border border-[color-mix(in_srgb,var(--accent)_38%,transparent)] bg-[var(--accent-soft)] px-4 py-2.5 text-[15px]">
+                      {m.content}
+                    </div>
                   </div>
                 ) : (
-                  <div className="group">
-                    <Markdown>{m.content}</Markdown>
-                    <div className="mt-2 flex gap-2 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        onClick={() => navigator.clipboard.writeText(m.content)}
-                        className="rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]"
-                      >
-                        Salin
-                      </button>
-                      {i === messages.length - 1 && !streaming ? (
+                  <div className="group flex gap-3.5">
+                    <span className="mt-0.5 hidden shrink-0 sm:block">
+                      <BrandMark size={24} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Markdown>{m.content}</Markdown>
+                      <div className="mt-2.5 flex gap-1.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
                         <button
-                          onClick={regenerate}
-                          className="rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]"
+                          onClick={() => navigator.clipboard.writeText(m.content)}
+                          title="Salin jawaban"
+                          className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--muted)] transition hover:text-[var(--fg)]"
                         >
-                          Buat ulang
+                          <Copy size={13} /> Salin
                         </button>
-                      ) : null}
+                        {i === messages.length - 1 && !streaming ? (
+                          <button
+                            onClick={regenerate}
+                            title="Buat ulang jawaban"
+                            className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--muted)] transition hover:text-[var(--fg)]"
+                          >
+                            <ArrowsClockwise size={13} /> Ulangi
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -301,21 +327,29 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
             ))}
 
             {streamText ? (
-              <div className="mb-6">
-                <Markdown>{streamText}</Markdown>
-                <span className="mt-1 inline-block h-4 w-2 animate-pulse bg-[#facc15]" />
+              <div className="mb-7 flex gap-3.5">
+                <span className="mt-0.5 hidden shrink-0 sm:block">
+                  <BrandMark size={24} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Markdown>{streamText}</Markdown>
+                  <span className="caret" aria-hidden />
+                </div>
               </div>
             ) : null}
 
-            {error ? <p className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">{error}</p> : null}
+            {error ? (
+              <p className="mb-5 rounded-xl border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-4 py-2.5 text-sm text-[var(--danger)]">
+                {error}
+              </p>
+            ) : null}
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* composer */}
-      <div className="border-t border-[var(--border)] bg-[var(--bg)] px-3 pb-4 pt-3">
-        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-[var(--border)] bg-[var(--sidebar)] px-3 py-2">
+      <div className="border-t border-[var(--border)] bg-[var(--bg)] px-5 pb-5 pt-4">
+        <div className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus-within:border-[var(--border-strong)] focus-within:shadow-[0_2px_10px_rgba(0,0,0,0.06)]">
           <textarea
             ref={taRef}
             value={input}
@@ -327,25 +361,28 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
               }
             }}
             rows={1}
-            placeholder="Kirim pesan…"
-            className="max-h-[240px] w-full resize-none bg-transparent px-2 py-2 text-[15px] outline-none"
+            placeholder="Tulis pesan…"
+            className="max-h-[220px] w-full resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed text-[var(--fg)] placeholder:text-[var(--muted)] focus:outline-none"
           />
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] text-[var(--muted)]">Enter kirim · Shift+Enter baris baru</span>
+          <div className="mt-1 flex items-center justify-between px-1">
+            <span className="hidden text-xs text-[var(--faint)] sm:inline">
+              Enter kirim, Shift+Enter baris baru
+            </span>
             {streaming ? (
               <button
                 onClick={() => abortRef.current?.abort()}
-                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5"
+                className="ml-auto flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:text-[var(--fg)] active:scale-95"
               >
-                ■ Berhenti
+                <Prohibit size={14} /> Berhenti
               </button>
             ) : (
               <button
                 onClick={() => void send(input, currentModel)}
                 disabled={!input.trim()}
-                className="rounded-lg bg-[#facc15] px-4 py-1.5 text-sm font-semibold text-black transition disabled:opacity-40"
+                aria-label="Kirim pesan"
+                className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)] transition hover:brightness-95 active:scale-95 disabled:opacity-35"
               >
-                Kirim
+                <ArrowUp size={17} weight="bold" />
               </button>
             )}
           </div>

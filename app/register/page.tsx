@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import AuthForm from "@/components/auth-form";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Daftar — AI" };
+export const metadata = { title: "Daftar" };
 
 export default async function RegisterPage() {
   const user = await getSessionUser();
