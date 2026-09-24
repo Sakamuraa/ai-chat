@@ -19,6 +19,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai.onheil.fun"),
   title: { default: "OnheilAI", template: "%s · OnheilAI" },
   description: "Chat OnheilAI: sesi tersimpan per akun, judul otomatis, banyak model.",
   openGraph: { title: "OnheilAI", images: ["/og.png"] },
