@@ -5,6 +5,7 @@ dist/
 .vercel
 .env
 .env*.local
+.env.vercel
 *.log
 .DS_Store
 tsconfig.tsbuildinfo
