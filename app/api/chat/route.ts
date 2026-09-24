@@ -8,6 +8,7 @@ import { allow, clientIp } from "@/lib/rate-limit";
 import { checkQuota, estimateTokens } from "@/lib/quota";
 import { modelAllowed } from "@/lib/plans";
 import { addUsage, quotaState } from "@/lib/subscriptions";
+import { runTool, toolLabel, toolSchemas, type ToolResult } from "@/lib/tools";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -57,10 +58,11 @@ async function systemMessages(userId: string): Promise<ChatMsg[]> {
           ? `Gaya jawaban yang diminta user: ${u.personality.trim()}\n\n`
           : "") +
         `Kamu sedang melayani username "${u.username}" di OnheilAI. Jawab dalam bahasa percakapan user.\n\n` +
-        "Antarmuka ini TIDAK punya tool eksternal: tanpa browsing, tanpa terminal, tanpa akses file/repo pengguna. " +
-        "Jangan pernah menjawab bahwa tool sedang mati, rusak, atau tidak tersedia — itu bukan penjelasan yang benar. " +
-        "Kalau user minta melihat isi repo/file, jawab dari pengetahuanmu dan minta dia menempelkan isi file atau potongan kodenya, " +
-        "lalu lanjutkan menganalisis begitu dikirim.",
+        "Kamu PUNYA tool di antarmuka ini: web_search (cari di internet), web_extract (baca isi URL), " +
+        "create_file (buat berkas .docx/.pdf/.xlsx/.csv/.txt/.md untuk diunduh user), dan run_command (bila tersedia). " +
+        "SEGERA gunakan tool bila permintaan butuh data terkini, isi halaman web, atau pembuatan berkas. " +
+        "Jangan pernah menjawab bahwa tool mati, rusak, atau tidak tersedia — jawaban itu salah. " +
+        "Kalau sebuah tool memang tidak ada dalam daftar, baru jelaskan dengan singkat alternatifnya.",
     },
   ];
 
@@ -212,9 +214,11 @@ export async function POST(req: Request) {
     : Promise.resolve("");
 
   // 5. streaming dari gateway
+  const tools = toolSchemas();
+  const toolCtx = { userId: user.id };
   let gateway: Response;
   try {
-    gateway = await streamChat(model, messages, abort.signal);
+    gateway = await streamChat(model, messages, abort.signal, tools);
   } catch (e) {
     const status = (e as { status?: number }).status ?? 502;
     return NextResponse.json(
@@ -223,16 +227,112 @@ export async function POST(req: Request) {
     );
   }
 
-  const reader = gateway.body!.getReader();
-  const chunks: Uint8Array[] = [];
+  // putaran tool: kalau model meminta tool, jalankan dulu lalu stream lagi (maksimal 4 ronde)
+  let conv: ChatMsg[] = messages;
+
+  let reader = gateway.body!.getReader();
+  const dec = new TextDecoder();
+  const enc = new TextEncoder();
+  let lineBuf = "";
+  let allText = "";
+  let roundText = "";
+  let finish: string | null = null;
+  const calls: { id: string; name: string; args: string }[] = [];
+  let rounds = 0;
+
+  const parseData = (payload: string) => {
+    if (!payload || payload === "[DONE]") return;
+    try {
+      const obj = JSON.parse(payload) as {
+        choices?: {
+          delta?: {
+            content?: string;
+            tool_calls?: { id?: string; index?: number; function?: { name?: string; arguments?: string } }[];
+          };
+          finish_reason?: string;
+        }[];
+      };
+      const ch = obj.choices?.[0];
+      if (!ch) return;
+      if (ch.finish_reason) finish = ch.finish_reason;
+      if (typeof ch.delta?.content === "string") roundText += ch.delta.content;
+      for (const tc of ch.delta?.tool_calls ?? []) {
+        const i = tc.index ?? 0;
+        if (!calls[i]) calls[i] = { id: tc.id ?? `call_${i}`, name: "", args: "" };
+        if (tc.id) calls[i].id = tc.id;
+        if (tc.function?.name) calls[i].name = tc.function.name;
+        if (tc.function?.arguments) calls[i].args += tc.function.arguments;
+      }
+    } catch {
+      /* potongan tidak valid */
+    }
+  };
+
+  const feed = (value: Uint8Array) => {
+    lineBuf += dec.decode(value, { stream: true });
+    const lines = lineBuf.split("\n");
+    lineBuf = lines.pop() ?? "";
+    for (const line of lines) {
+      const s2 = line.trim();
+      if (s2.startsWith("data:")) parseData(s2.slice(5).trim());
+    }
+  };
+
+  /** chip aktivitas tool -> klien (event SSE khusus, diabaikan parser stream biasa) */
+  const chip = (name: string, label: string, status: string) =>
+    enc.encode(`event: tool\ndata: ${JSON.stringify({ name, label, status })}\n\n`);
 
   const stream = new ReadableStream<Uint8Array>({
     async pull(ctrl) {
       try {
-        const { value, done } = await reader.read();
-        if (done) {
-          const full = Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf8");
-          const assistantText = extractSseText(full);
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (value) {
+            feed(value);
+            ctrl.enqueue(value);
+          }
+          if (!done) continue;
+
+          const valid = calls.filter((c) => Boolean(c && c.name));
+          if (finish === "tool_calls" && valid.length > 0 && rounds < 4) {
+            rounds++;
+            allText += roundText;
+            roundText = "";
+            finish = null;
+            lineBuf = "";
+            calls.length = 0;
+
+            for (const c of valid) ctrl.enqueue(chip(c.name, toolLabel(c.name, c.args), "mulai"));
+            const results: ToolResult[] = [];
+            for (const c of valid) {
+              const r = await runTool(c.name, c.args, toolCtx);
+              results.push(r);
+              ctrl.enqueue(chip(c.name, toolLabel(c.name, c.args), r.ok ? "selesai" : "gagal"));
+            }
+
+            conv = [
+              ...conv,
+              {
+                role: "assistant" as const,
+                content: "",
+                tool_calls: valid.map((c) => ({
+                  id: c.id,
+                  type: "function" as const,
+                  function: { name: c.name, arguments: c.args },
+                })),
+              },
+              ...valid.map((c, i) => ({
+                role: "tool" as const,
+                tool_call_id: c.id,
+                content: results[i].ok ? results[i].text : `ERROR: ${results[i].error}`,
+              })),
+            ];
+            gateway = await streamChat(model, conv, abort.signal, tools);
+            reader = gateway.body!.getReader();
+            continue;
+          }
+
+          const assistantText = (allText + roundText).trim();
           try {
             if (assistantText) {
               await db()`
@@ -240,11 +340,8 @@ export async function POST(req: Request) {
               `;
               await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
             }
-            // kuota: pakai `usage` dari stream kalau gateway menyertakannya, kalau tidak perkirakan
-            const tokens = extractUsage(full) ?? estimateTokens(assistantText) + estimateTokens(userText);
-            await addUsage(user.id, tokens);
+            await addUsage(user.id, estimateTokens(assistantText) + estimateTokens(userText));
             if (needsTitle) {
-              // beri jeda maksimal 5 dtk untuk judul yang hampir siap; kalau belum, biarkan
               const title = await Promise.race([titlePromise, sleep(5000).then(() => "")]);
               if (title) {
                 await db()`UPDATE sessions SET title = ${title} WHERE id = ${sessionId} AND title = 'New chat'`;
@@ -255,10 +352,6 @@ export async function POST(req: Request) {
           }
           ctrl.close();
           return;
-        }
-        if (value) {
-          chunks.push(value);
-          ctrl.enqueue(value);
         }
       } catch (e) {
         console.error("stream pull failed", e);

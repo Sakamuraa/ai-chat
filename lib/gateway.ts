@@ -13,14 +13,33 @@ export type ChatPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 
-export type ChatMsg = { role: "system" | "user" | "assistant"; content: string | ChatPart[] };
+export type ToolCallRef = { id: string; type: "function"; function: { name: string; arguments: string } };
+export type ChatMsg = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | ChatPart[] | null;
+  /** hanya pada pesan assistant yang memanggil tool */
+  tool_calls?: ToolCallRef[];
+  /** hanya pada balasan tool */
+  tool_call_id?: string;
+};
 
 /** Streaming SSE mentah dari gateway — diteruskan ke client apa adanya. */
-export async function streamChat(model: string, messages: ChatMsg[], signal?: AbortSignal) {
+export async function streamChat(
+  model: string,
+  messages: ChatMsg[],
+  signal?: AbortSignal,
+  /** daftar tool OpenAI-compatible; kosong = tanpa tool */
+  tools?: unknown[],
+) {
   const res = await fetch(`${BASE()}/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key()}` },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      ...(tools && tools.length ? { tools, tool_choice: "auto" } : {}),
+    }),
     signal: signal ?? AbortSignal.timeout(300_000),
   });
   if (!res.ok || !res.body) {

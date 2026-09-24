@@ -50,6 +50,8 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
+  // langkah tool (mencari / membaca / membuat berkas) selama stream berjalan
+  const [toolSteps, setToolSteps] = useState<{ label: string; status: string }[]>([]);
   const [error, setError] = useState("");
   const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
   // model terakhir dipilih disimpan di localStorage supaya halaman sesi tak kembali ke model awal
@@ -256,6 +258,7 @@ async function compressImage(file: File): Promise<string> {
     setError("");
     setStreaming(true);
     setStreamText("");
+    setToolSteps([]);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
@@ -279,6 +282,7 @@ async function compressImage(file: File): Promise<string> {
       const dec = new TextDecoder();
       let buf = "";
       let acc = "";
+      let evt = "";
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -287,9 +291,35 @@ async function compressImage(file: File): Promise<string> {
         buf = lines.pop() ?? "";
         for (const line of lines) {
           const s = line.trim();
+          if (s.startsWith("event:")) {
+            evt = s.slice(6).trim();
+            continue;
+          }
           if (!s.startsWith("data:")) continue;
           const payload2 = s.slice(5).trim();
-          if (!payload2 || payload2 === "[DONE]") continue;
+          if (!payload2 || payload2 === "[DONE]") {
+            evt = "";
+            continue;
+          }
+          if (evt === "tool") {
+            evt = "";
+            try {
+              const step = JSON.parse(payload2) as { label: string; status: string };
+              setToolSteps((prev) => {
+                const idx = prev.map((x) => x.label).lastIndexOf(step.label);
+                if (idx >= 0) {
+                  const copy = [...prev];
+                  copy[idx] = step;
+                  return copy;
+                }
+                return [...prev, step];
+              });
+            } catch {
+              /* langkah tidak utuh */
+            }
+            continue;
+          }
+          evt = "";
           try {
             const obj = JSON.parse(payload2) as { choices?: { delta?: { content?: string } }[] };
             const piece = obj.choices?.[0]?.delta?.content;
@@ -606,6 +636,31 @@ async function compressImage(file: File): Promise<string> {
                 )}
               </div>
             ))}
+
+            {toolSteps.length > 0 ? (
+              <div className="mb-5 flex flex-wrap gap-2">
+                {toolSteps.map((s, i) => (
+                  <span
+                    key={`${s.label}-${i}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1 text-[11px] text-[var(--muted)]"
+                  >
+                    <span
+                      aria-hidden
+                      className={
+                        s.status === "gagal"
+                          ? "text-[var(--danger)]"
+                          : s.status === "selesai"
+                            ? "text-[var(--accent)]"
+                            : "animate-pulse text-[var(--accent)]"
+                      }
+                    >
+                      ●
+                    </span>
+                    {s.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
 
             {streaming && !streamText ? (
               <div className="mb-7 flex items-start gap-3.5">
