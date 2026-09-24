@@ -224,7 +224,7 @@ const create: ToolDef = {
 
     const rows = (await db()`
       INSERT INTO generated_files (user_id, name, mime, data)
-      VALUES (${ctx.userId}, ${filename}, ${MIME[ext]}, ${bytes.toString("base64")}::bytea)
+      VALUES (${ctx.userId}, ${filename}, ${MIME[ext]}, decode(${bytes.toString("base64")}, 'base64'))
       RETURNING id
     `) as unknown as { id: string }[];
     const id = rows[0]?.id;
