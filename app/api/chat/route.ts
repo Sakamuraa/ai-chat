@@ -73,42 +73,61 @@ export async function POST(req: Request) {
   // judul auto hanya untuk chat pertama (regenerate tidak boleh mengulanginya)
   const isFirstUserMessage = history.filter((m) => m.role === "user").length === 1 && !regenerate;
 
+  // after() HARUS dipanggil di scope request (bukan di dalam pull -> di luar scope = throw).
+  // Callback menunggu stream selesai lewat deferred, jadi judul tidak menahan respons.
+  let markStreamDone!: () => void;
+  const streamDone = new Promise<void>((res) => {
+    markStreamDone = res;
+  });
+  if (isFirstUserMessage && sessions[0].title === "New chat") {
+    const firstUser = history.filter((m) => m.role === "user").pop()?.content ?? content;
+    after(async () => {
+      await streamDone;
+      try {
+        const title = await generateTitle(firstUser);
+        if (title) {
+          await db()`UPDATE sessions SET title = ${title} WHERE id = ${sessionId} AND title = 'New chat'`;
+        }
+      } catch (e) {
+        console.error("title generation failed", e); // fail-open: biarkan 'New chat'
+      }
+    });
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     async pull(ctrl) {
-      const { value, done } = await reader.read();
-      if (done) {
-        const full = Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf8");
-        const text = extractSseText(full);
-        try {
-          if (text) {
-            await db()`
-              INSERT INTO messages (session_id, role, content) VALUES (${sessionId}, 'assistant', ${text})
-            `;
-            await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
-          }
-        } catch (e) {
-          console.error("persist assistant failed", e);
-        }
-        // judul auto — di luar jalur respons (fail-open)
-        if (isFirstUserMessage && sessions[0].title === "New chat") {
-          const firstUser = history.filter((m) => m.role === "user").pop()?.content ?? content;
-          after(async () => {
-            const title = await generateTitle(firstUser);
-            if (title) {
-              await db()`UPDATE sessions SET title = ${title} WHERE id = ${sessionId} AND title = 'New chat'`;
+      try {
+        const { value, done } = await reader.read();
+        if (done) {
+          const full = Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf8");
+          const text = extractSseText(full);
+          try {
+            if (text) {
+              await db()`
+                INSERT INTO messages (session_id, role, content) VALUES (${sessionId}, 'assistant', ${text})
+              `;
+              await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
             }
-          });
+          } catch (e) {
+            console.error("persist assistant failed", e);
+          }
+          markStreamDone();
+          ctrl.close();
+          return;
         }
-        ctrl.close();
-        return;
-      }
-      if (value) {
-        chunks.push(value);
-        ctrl.enqueue(value);
+        if (value) {
+          chunks.push(value);
+          ctrl.enqueue(value);
+        }
+      } catch (e) {
+        console.error("stream pull failed", e);
+        markStreamDone();
+        ctrl.error(e);
       }
     },
     cancel() {
       abort.abort();
+      markStreamDone();
     },
   });
 

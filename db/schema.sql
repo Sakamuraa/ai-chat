@@ -33,11 +33,3 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tokens_user ON auth_tokens(user_id);
-
--- bootstrap admin: user pertama otomatis admin (dijalankan app juga, ini cadangan)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM users) THEN
-    NULL; -- tidak ada seed password hardcoded; admin lahir dari register pertama
-  END IF;
-END $$;

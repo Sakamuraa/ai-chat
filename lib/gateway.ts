@@ -70,20 +70,33 @@ export const FALLBACK_MODELS = [
 
 const TITLE_MODEL = () => process.env.TITLE_MODEL ?? "onheil-1.1-luna";
 
+const TITLE_CANDIDATES = () => {
+  const primary = process.env.TITLE_MODEL ?? "onheil-1.1-luna";
+  // fallback: upstream studio kadang balas kosong (finish_reason=length) — pakai combo yang terbukti hidup
+  return primary === "free" ? ["free"] : [primary, "free"];
+};
+
 /** Judul sesi otomatis dari pesan pertama. Fail-open: string kosong = caller biarkan 'New chat'. */
 export async function generateTitle(firstUserMessage: string): Promise<string> {
-  try {
-    const out = await completeChat(TITLE_MODEL(), [
-      {
-        role: "system",
-        content:
-          "You write chat titles. Reply with at most 6 words, no quotes, no trailing period, title case. Reply with the title only.",
-      },
-      { role: "user", content: firstUserMessage.slice(0, 400) },
-    ]);
-    const clean = out.trim().replace(/^["']|["']$/g, "").replace(/\.$/, "").slice(0, 60);
-    return clean;
-  } catch {
-    return "";
+  const sys = {
+    role: "system" as const,
+    content:
+      "You write chat titles. Reply with exactly 3 to 5 words in Title Case. No punctuation, no quotes, no explanation. Title only.",
+  };
+  const user = { role: "user" as const, content: firstUserMessage.slice(0, 400) };
+
+  for (const model of TITLE_CANDIDATES()) {
+    try {
+      const out = await completeChat(model, [sys, user]);
+      const clean = out
+        .trim()
+        .replace(/^["'\s]+|["'\s]+$/g, "")
+        .replace(/[.,;:!?]+$/g, "");
+      const words = clean.split(/\s+/).filter(Boolean);
+      if (words.length > 0) return words.slice(0, 6).join(" ").slice(0, 60); // batas: 6 kata / 60 char
+    } catch {
+      /* kandidat berikutnya */
+    }
   }
+  return "";
 }
