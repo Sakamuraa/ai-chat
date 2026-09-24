@@ -98,7 +98,8 @@ export async function POST(req: Request) {
         : "Data tidak valid.";
     return NextResponse.json({ error: "invalid_body", detail }, { status: 400 });
   }
-  const { sessionId, model, content, regenerate, editMessageId, attachments } = parsed.data;
+  const { sessionId, model, regenerate, editMessageId, attachments } = parsed.data;
+  let { content } = parsed.data;
   const isEdit = Boolean(editMessageId) || Boolean(regenerate);
 
   // kuota per akun (15 chat / 10 mnt) dan per IP (30 / 10 mnt) — pembatas terakhir
@@ -189,10 +190,15 @@ export async function POST(req: Request) {
   const turns: ChatMsg[] = history.map((m) => ({ role: m.role, content: m.content }));
 
   // gambar hanya untuk giliran ini (tidak disimpan ke DB supaya tidak membengkak)
-  if (images.length > 0) {
+  // PagU: upstream multimodal gagal membaca base64 besar (terpotong -> "gambar rusak").
+  const MAX_IMAGE_CHARS = 1_500_000;
+  const oversize = images.filter((i) => i.data.length > MAX_IMAGE_CHARS).length;
+  const visionImages = oversize > 0 ? images.filter((i) => i.data.length <= MAX_IMAGE_CHARS) : images;
+  if (oversize > 0) content = `${content}\n\n[catatan: ${oversize} gambar dilewati karena terlalu besar]`;
+  if (visionImages.length > 0) {
     const parts: ChatPart[] = [
       { type: "text", text: content },
-      ...images.map((i) => ({ type: "image_url" as const, image_url: { url: i.data } })),
+      ...visionImages.map((i) => ({ type: "image_url" as const, image_url: { url: i.data } })),
     ];
     for (let i = turns.length - 1; i >= 0; i--) {
       if (turns[i].role === "user") {
