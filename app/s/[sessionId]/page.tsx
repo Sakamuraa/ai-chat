@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import ShareView from "@/components/share-view";
 import type { Msg } from "@/components/chat-view";
 import { isUuid } from "@/lib/uuid";
+import { slimAttachments } from "@/lib/attachments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export default async function SharePage({ params }: { params: Promise<{ sessionI
         id: m.id,
         role: m.role,
         content: m.content,
-        attachments: m.attachments ?? [],
+        attachments: slimAttachments(m.attachments),
       }))}
     />
   );

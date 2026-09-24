@@ -23,3 +23,20 @@ export function classifyFile(name: string, mime: string): FileClass {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   return TEXT_EXTS.includes(ext) ? "text" : "unsupported";
 }
+
+/** Batas data yang boleh dibawa inline dalam HTML/API: di atas ini
+ *  base64 ditarik dan dilayani terpisah lewat /api/messages/<id>/attachments/<i>
+ *  (alasan halaman bagikan bisa menyentuh 8 MB). */
+export const INLINE_LIMIT = 20_000;
+
+export function slimAttachments(
+  list: { name: string; kind: "image" | "text"; mime: string; data: string }[] | null | undefined,
+): { name: string; kind: "image" | "text"; mime: string; data: string }[] {
+  if (!list) return [];
+  return list.map((a) => ({
+    name: a.name,
+    kind: a.kind,
+    mime: a.mime,
+    data: a.data && a.data.length > INLINE_LIMIT ? "" : a.data,
+  }));
+}

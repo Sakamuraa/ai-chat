@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { isUuid } from "@/lib/uuid";
+import { slimAttachments } from "@/lib/attachments";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     attachments: { name: string; kind: "image" | "text"; mime: string; data: string }[] | null;
   }[];
 
-  return NextResponse.json({ session: sessions[0], messages });
+  return NextResponse.json({ session: sessions[0], messages: messages.map((m) => ({ ...m, attachments: slimAttachments(m.attachments) })) });
 }
 
 const Patch = z.object({

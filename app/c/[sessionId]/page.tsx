@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import ChatView, { type Msg } from "@/components/chat-view";
-import type { Attachment } from "@/lib/attachments";
+import { slimAttachments, type Attachment } from "@/lib/attachments";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,7 @@ export default async function SessionPage({ params }: Props) {
       sessionId={sessions[0].id}
       title={sessions[0].title}
       model={sessions[0].model}
-      initialMessages={messages.map((m) => ({ ...m, attachments: m.attachments ?? [] }))}
+      initialMessages={messages.map((m) => ({ ...m, attachments: slimAttachments(m.attachments) }))}
       owner
     />
   );

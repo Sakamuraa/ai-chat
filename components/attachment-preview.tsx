@@ -19,16 +19,17 @@ function extOf(name: string): string {
 }
 
 /** Isi preview popup sesuai jenis berkas. */
-function LightboxBody({ a }: { a: Attachment }) {
+function LightboxBody({ a, url }: { a: Attachment; url: string }) {
   const k = kindOf(a);
+  const src = a.data || url;
   if (k === "image") {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={a.data} alt={a.name} className="max-h-[80vh] max-w-[92vw] rounded-xl object-contain" />;
+    return <img src={src} alt={a.name} className="max-h-[80vh] max-w-[92vw] rounded-xl object-contain" />;
   }
   if (k === "pdf") {
-    return <iframe src={a.data} title={a.name} className="h-[80vh] w-[92vw] rounded-xl border border-[var(--border)] bg-white" />;
+    return <iframe src={src} title={a.name} className="h-[80vh] w-[92vw] rounded-xl border border-[var(--border)] bg-white" />;
   }
-  if (k === "text") {
+  if (k === "text" && a.data) {
     return (
       <div className="max-h-[80vh] w-[92vw] overflow-auto rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-4">
         <p className="mb-2 text-xs text-[var(--muted)]">{a.name}</p>
@@ -44,7 +45,7 @@ function LightboxBody({ a }: { a: Attachment }) {
       <p className="max-w-full break-all text-center text-sm text-[var(--fg)]">{a.name}</p>
       <p className="text-xs text-[var(--muted)]">{extOf(a.name)}</p>
       <a
-        href={a.data}
+        href={a.data || url}
         download={a.name}
         className="flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)]"
       >
@@ -58,10 +59,18 @@ function LightboxBody({ a }: { a: Attachment }) {
 export default function AttachmentPreview({
   attachments,
   compact = false,
+  messageId,
 }: {
   attachments: Attachment[];
   compact?: boolean;
+  /** pesan pemilik lampiran — dipakai saat base64 ditarik (dilayani /api/messages/.../attachments/...) */
+  messageId?: string;
 }) {
+  const urlOf = (idx: number): string => {
+    const a = attachments[idx];
+    if (a?.data) return a.data;
+    return messageId ? `/api/messages/${messageId}/attachments/${idx}` : "";
+  };
   const { t } = useI18n();
   const [open, setOpen] = useState<Attachment | null>(null);
 
@@ -90,7 +99,7 @@ export default function AttachmentPreview({
                 className="group relative h-16 w-16 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--sidebar)] transition hover:border-[var(--border-strong)]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.data} alt={a.name} className="h-full w-full object-cover" />
+                <img src={a.data || urlOf(i)} alt={a.name} className="h-full w-full object-cover" />
               </button>
             );
           }
@@ -131,7 +140,7 @@ export default function AttachmentPreview({
             <X size={18} />
           </button>
           <div onClick={(e) => e.stopPropagation()}>
-            <LightboxBody a={open} />
+            <LightboxBody url={urlOf(attachments.findIndex((x) => x === open))} a={open} />
           </div>
         </div>
       ) : null}

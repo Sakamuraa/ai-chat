@@ -565,7 +565,7 @@ async function pickFiles(list: FileList | null) {
 
                     {m.attachments && m.attachments.length > 0 ? (
                       <div className="mt-2 max-w-[86%]">
-                        <AttachmentPreview attachments={m.attachments} compact />
+                        <AttachmentPreview attachments={m.attachments} compact messageId={m.id} />
                       </div>
                     ) : null}
 
