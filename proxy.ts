@@ -1,11 +1,11 @@
-// language: TypeScript, file: middleware.ts, target: Next.js Edge middleware (hanya cek keberadaan cookie)
-// *validasi sesi SEBENARNYA ada di route handler / server component (node:crypto tidak jalan di Edge)*
+// language: TypeScript, file: proxy.ts, target: Next.js 16 edge guard (cuma cek keberadaan cookie)
+// *Next 16: konvensi middleware diganti proxy — validasi sesi SEBENARNYA di route handler / server component*
 import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED_PREFIX = ["/c/", "/api/chat", "/api/sessions"];
 const PUBLIC_API = ["/api/auth/"];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isProtected = PROTECTED_PREFIX.some((p) => pathname.startsWith(p));
   if (!isProtected) return NextResponse.next();
