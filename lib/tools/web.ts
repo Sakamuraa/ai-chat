@@ -65,25 +65,56 @@ const search: ToolDef = {
     if (!q) return { ok: false, error: "query kosong" };
     const n = Math.min(8, Math.max(1, Number(args.n) || 5));
     try {
-      const res = await safeFetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`);
-      const html = await res.text();
-      const items: { title: string; url: string; snippet: string }[] = [];
-      const re = /<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:class="result__snippet"[^>]*>([\s\S]*?)<\/a>)?/g;
       const strip = (s: string) => htmlToText(s, 300);
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(html)) && items.length < n) {
-        let href = m[1];
-        if (href.startsWith("//duckduckgo.com/l/?uddg=")) {
-          try {
-            href = decodeURIComponent(new URL("https:" + href).searchParams.get("uddg") ?? href);
-          } catch {
-            /* biarkan */
+      const clean = (href: string): string => {
+        let h = href;
+        for (const prefix of ["//duckduckgo.com/l/?uddg=", "https://duckduckgo.com/l/?uddg="]) {
+          if (h.startsWith(prefix)) {
+            try {
+              h = decodeURIComponent(new URL(h.startsWith("//") ? "https:" + h : h).searchParams.get("uddg") ?? h);
+            } catch {
+              /* biarkan */
+            }
           }
         }
-        if (!href.startsWith("http")) continue;
-        items.push({ title: strip(m[2]).trim(), url: href, snippet: m[3] ? strip(m[3]).trim() : "" });
+        return h;
+      };
+      const parse = (html: string): { title: string; url: string; snippet: string }[] => {
+        const out: { title: string; url: string; snippet: string }[] = [];
+        // pola 1: html.duckduckgo.com (result__a + snippet)
+        const re1 = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>([\s\S]{0,600}?class="result__snippet"[^>]*>([\s\S]*?)<\/a>)?/g;
+        let m: RegExpExecArray | null;
+        while ((m = re1.exec(html)) && out.length < n * 3) {
+          const href = clean(m[1]);
+          if (!href.startsWith("http")) continue;
+          out.push({ title: strip(m[2]).trim(), url: href, snippet: m[4] ? strip(m[4]).trim() : "" });
+        }
+        if (out.length > 0) return out;
+        // pola 2: lite.duckduckgo.com (tautan langsung, tanpa kelas)
+        const re2 = /<a[^>]*rel="nofollow"[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+        while ((m = re2.exec(html)) && out.length < n * 3) {
+          const href = clean(m[1]);
+          if (href.includes("duckduckgo.com")) continue;
+          out.push({ title: strip(m[2]).trim(), url: href, snippet: "" });
+        }
+        return out;
+      };
+
+      let items: { title: string; url: string; snippet: string }[] = [];
+      for (const endpoint of [
+        `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+        `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(q)}`,
+      ]) {
+        try {
+          const res = await safeFetch(endpoint);
+          items = parse(await res.text());
+        } catch {
+          items = [];
+        }
+        if (items.length > 0) break;
       }
       if (items.length === 0) return { ok: false, error: `tidak ada hasil untuk "${q}"` };
+      items = items.slice(0, n);
       const text = items
         .map((it, i) => `${i + 1}. ${it.title}\n   ${it.url}${it.snippet ? `\n   ${it.snippet}` : ""}`)
         .join("\n");
