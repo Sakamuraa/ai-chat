@@ -44,10 +44,23 @@ export default function ModelSelect({
   lockedIds?: readonly string[];
 }) {
   const [open, setOpen] = useState(false);
+  // posisi menu dihitung ulang terhadap viewport — layar HP sempit: popup tidak boleh terpotong
+  const [geo, setGeo] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const current = modelLabel(value);
   const currentValueBadge = MODEL_BADGE[value] ?? "";
   const isLocked = (id: string) => lockedIds.includes(id);
+
+  useEffect(() => {
+    if (!open) return setGeo(null);
+    const r = box.current?.getBoundingClientRect();
+    if (!r) return setGeo(null);
+    const width = Math.min(262, Math.max(200, window.innerWidth - 16));
+    // default: menu melebar ke kiri (ujung kanan sejajar tombol), lalu dijepit ke dalam layar
+    const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8));
+    const v = direction === "up" ? { bottom: Math.max(8, window.innerHeight - r.top + 8) } : { top: r.bottom + 8 };
+    setGeo({ left, width, ...v });
+  }, [open, direction]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,9 +96,16 @@ export default function ModelSelect({
       {open ? (
         <div
           role="listbox"
-          className={`fade-up absolute right-0 z-50 max-h-[60dvh] w-[262px] overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)] [touch-action:manipulation] ${
+          className={`fade-up z-50 max-h-[60dvh] overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)] [touch-action:manipulation] ${
+            geo ? "fixed" : "absolute right-0 w-[262px]"
+          } ${
             direction === "up" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"
           }`}
+          style={
+            geo
+              ? { position: "fixed", left: geo.left, width: geo.width, top: geo.top, bottom: geo.bottom }
+              : undefined
+          }
         >
           {models.map((m) => {
             const active = m.id === value;
