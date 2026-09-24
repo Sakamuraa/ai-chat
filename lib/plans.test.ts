@@ -3,13 +3,15 @@ import { describe, it, expect } from "vitest";
 import { allowedModels, effectivePlan, modelAllowed, PLAN_MODELS } from "./plans";
 
 describe("paket model", () => {
-  it("free hanya 1.1, pro menambah 1.5, max menambah asteria", () => {
+  it("free hanya 1.1; pro menambah 1.5 selenia+solaria; max menambah asteria+celestia", () => {
     expect(PLAN_MODELS.free).toEqual(["onheil-1.1-luna"]);
-    expect(PLAN_MODELS.pro).toEqual(["onheil-1.1-luna", "onheil-1.5-selenia"]);
+    expect(PLAN_MODELS.pro).toEqual(["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-1.5-solaria"]);
     expect(PLAN_MODELS.max).toEqual([
       "onheil-1.1-luna",
       "onheil-1.5-selenia",
+      "onheil-1.5-solaria",
       "onheil-2-asteria",
+      "onheil-2.5-celestia",
     ]);
   });
 
@@ -18,6 +20,10 @@ describe("paket model", () => {
     expect(modelAllowed("pro", "onheil-1.5-selenia")).toBe(true);
     expect(modelAllowed("pro", "onheil-2-asteria")).toBe(false);
     expect(modelAllowed("max", "onheil-2-asteria")).toBe(true);
+    expect(modelAllowed("pro", "onheil-1.5-solaria")).toBe(true);
+    expect(modelAllowed("pro", "onheil-2.5-celestia")).toBe(false);
+    expect(modelAllowed("max", "onheil-2.5-celestia")).toBe(true);
+    expect(modelAllowed("free", "onheil-1.5-solaria")).toBe(false);
   });
 
   it("pakai langganan aktif untuk menaikkan paket", () => {

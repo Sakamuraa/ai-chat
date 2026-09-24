@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 export type Me = {
   id: string;
   username: string;
+  email: string | null;
   avatar_url: string | null;
   personality: string | null;
   memory_enabled: boolean;
@@ -28,7 +29,7 @@ export async function GET() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const rows = (await db()`
-    SELECT id, username, avatar_url, personality, memory_enabled, language, is_admin
+    SELECT id, username, email, avatar_url, personality, memory_enabled, language, is_admin
     FROM users WHERE id = ${user.id}
   `) as unknown as Me[];
   if (!rows[0]) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -58,7 +59,7 @@ export async function PATCH(req: Request) {
         memory_enabled = COALESCE(${p.memory_enabled ?? null}, memory_enabled),
         language    = COALESCE(${p.language ?? null}, language)
       WHERE id = ${user.id}
-      RETURNING id, username, avatar_url, personality, memory_enabled, language, is_admin
+      RETURNING id, username, email, avatar_url, personality, memory_enabled, language, is_admin
     `) as unknown as Me[];
     return NextResponse.json({ user: rows[0] });
   } catch (e) {

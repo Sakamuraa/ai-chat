@@ -620,13 +620,17 @@ async function pickFiles(list: FileList | null) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <Markdown>{m.content}</Markdown>
-                      <p className="mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--faint)]">
-                        {displayModel(m.model ?? currentModel)}
-                      </p>
-
-                      {i === lastAssistantIdx && !streaming ? (
-                        <p className="mt-3 text-xs text-[var(--faint)]">{t("chat.disclaimer")}</p>
-                      ) : null}
+                      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[10px] uppercase tracking-wider text-[var(--faint)]">
+                        <span className="font-medium">{displayModel(m.model ?? currentModel)}</span>
+                        {i === lastAssistantIdx && !streaming ? (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-[11px] normal-case tracking-normal">
+                              {t("chat.disclaimer")}
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
 
                       {readOnly ? null : (
                         <div className="mt-2.5 flex gap-1.5 opacity-0 transition group-hover/msg:opacity-100 focus-within:opacity-100">
@@ -711,7 +715,11 @@ async function pickFiles(list: FileList | null) {
                 <div className="min-w-0 flex-1">
                   <Markdown>{streamText}</Markdown>
                   <span className="caret" aria-hidden />
-                  <p className="mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--faint)]">{modelLabel}</p>
+                  <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[10px] uppercase tracking-wider text-[var(--faint)]">
+                    <span className="font-medium">{modelLabel}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-[11px] normal-case tracking-normal">{t("chat.disclaimer")}</span>
+                  </div>
                 </div>
               </div>
             ) : null}

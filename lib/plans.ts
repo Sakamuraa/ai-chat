@@ -17,15 +17,23 @@ export const PLANS: { id: Plan; label: string }[] = [
 export const MODEL_LABELS: Record<string, string> = {
   "onheil-1.1-luna": "Onheil 1.1 Luna",
   "onheil-1.5-selenia": "Onheil 1.5 Selenia",
+  "onheil-1.5-solaria": "Onheil 1.5 Solaria",
   "onheil-2-asteria": "Onheil 2 Asteria",
+  "onheil-2.5-celestia": "Onheil 2.5 Celestia",
 };
 
 const RANK: Record<Plan, number> = { free: 0, pro: 1, max: 2 };
 
 export const PLAN_MODELS: Record<Plan, string[]> = {
   free: ["onheil-1.1-luna"],
-  pro: ["onheil-1.1-luna", "onheil-1.5-selenia"],
-  max: ["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-2-asteria"],
+  pro: ["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-1.5-solaria"],
+  max: [
+    "onheil-1.1-luna",
+    "onheil-1.5-selenia",
+    "onheil-1.5-solaria",
+    "onheil-2-asteria",
+    "onheil-2.5-celestia",
+  ],
 };
 
 export function isPlan(v: unknown): v is Plan {
@@ -62,5 +70,7 @@ export function modelAllowed(plan: Plan, model: string): boolean {
 export const MODEL_BADGE: Record<string, string> = {
   "onheil-1.1-luna": "",
   "onheil-1.5-selenia": "Pro",
+  "onheil-1.5-solaria": "Pro",
   "onheil-2-asteria": "Max",
+  "onheil-2.5-celestia": "Max",
 };

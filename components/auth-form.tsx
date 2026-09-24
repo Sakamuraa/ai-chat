@@ -40,7 +40,8 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const { t } = useI18n();
 
-  const [step, setStep] = useState<"form" | "otp">("form");
+  const [step, setStep] = useState<"form" | "otp" | "forgot">("form");
+  const [forgotSent, setForgotSent] = useState(false);
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -101,6 +102,34 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
     setNotice("");
     setBusy(true);
     try {
+      if (step === "forgot") {
+        if (!forgotSent) {
+          const res = await fetch("/api/auth/forgot", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const body = (await res.json().catch(() => ({}))) as { error?: string; devCode?: string };
+          if (!res.ok) return setError(messageOf(body));
+          setDevCode(body.devCode ?? "");
+          setForgotSent(true);
+          setCode("");
+          return;
+        }
+        const res = await fetch("/api/auth/reset", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, code, password }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+        if (!res.ok) return setError(messageOf(body));
+        setStep("form");
+        setForgotSent(false);
+        setNotice(t("auth.resetOk"));
+        setPassword("");
+        setConfirm("");
+        return;
+      }
       if (step === "otp") {
         const res = await fetch("/api/auth/verify", {
           method: "POST",
@@ -166,7 +195,11 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const isLogin = mode === "login";
   const hasOauth = providers.google || providers.discord;
   const canSubmit =
-    step === "otp"
+    step === "forgot"
+      ? forgotSent
+        ? Boolean(email) && /^\d{6}$/.test(code) && password.length >= 8
+        : /^\S+@\S+\.\S+$/.test(email)
+      : step === "otp"
       ? /^\d{6}$/.test(code)
       : isLogin
         ? Boolean(email && password)
@@ -180,7 +213,94 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       >
         <BrandMark size={28} />
 
-        {step === "otp" ? (
+        {step === "forgot" ? (
+          <>
+            <h1 className="mt-5 text-[22px] font-semibold tracking-tight">{t("auth.forgotTitle")}</h1>
+            <p className="mt-1.5 text-sm text-[var(--muted)]">{t("auth.forgotSub")}</p>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="f-email" className={LABEL}>
+                  {t("auth.email")}
+                </label>
+                <input
+                  id="f-email"
+                  type="email"
+                  disabled={forgotSent}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`${FIELD} disabled:opacity-60`}
+                  placeholder={t("auth.emailPh")}
+                />
+              </div>
+              {forgotSent ? (
+                <>
+                  <div>
+                    <label htmlFor="f-code" className={LABEL}>
+                      {t("auth.code")}
+                    </label>
+                    <input
+                      id="f-code"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                      className={`${FIELD} tracking-[0.5em]`}
+                      placeholder={t("auth.codePh")}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="f-pass" className={LABEL}>
+                      {t("auth.newPassword")}
+                    </label>
+                    <input
+                      id="f-pass"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="new-password"
+                      className={FIELD}
+                      placeholder={t("auth.passwordHint")}
+                    />
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            {devCode && forgotSent ? (
+              <p className="mt-3 font-mono text-xs text-[var(--faint)]">{t("auth.devCode", { code: devCode })}</p>
+            ) : null}
+            {notice ? <p className="mt-3 text-sm text-[var(--muted)]">{notice}</p> : null}
+            {error ? (
+              <p className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-3.5 py-2.5 text-sm text-[var(--danger)]">
+                {error}
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={busy || !canSubmit}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98] disabled:opacity-45"
+            >
+              {busy ? t("auth.processing") : forgotSent ? t("auth.reset") : t("auth.resend")}
+              {!busy ? <ArrowRight size={15} weight="bold" /> : null}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep("form");
+                setError("");
+                setNotice("");
+                setForgotSent(false);
+                setPassword("");
+              }}
+              className="mt-4 w-full text-center text-sm text-[var(--muted)] underline underline-offset-4 transition hover:text-[var(--fg)]"
+            >
+              {t("auth.back")}
+            </button>
+          </>
+        ) : step === "otp" ? (
           <>
             <h1 className="mt-5 text-[22px] font-semibold tracking-tight">{t("auth.verifyTitle")}</h1>
             <p className="mt-1.5 text-sm text-[var(--muted)]">{t("auth.verifySub", { email: pendingEmail })}</p>
@@ -309,9 +429,23 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
               </div>
 
               <div>
-                <label htmlFor="password" className={LABEL}>
-                  {t("auth.password")}
-                </label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label htmlFor="password" className="text-[13px] font-medium">
+                    {t("auth.password")}
+                  </label>
+                  {isLogin ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep("forgot");
+                        setError("");
+                      }}
+                      className="text-xs text-[var(--muted)] underline underline-offset-4 transition hover:text-[var(--fg)]"
+                    >
+                      {t("auth.forgot")}
+                    </button>
+                  ) : null}
+                </div>
                 <input
                   id="password"
                   type="password"

@@ -23,6 +23,7 @@ export const metadata: Metadata = {
   title: { default: "OnheilAI", template: "%s · OnheilAI" },
   description: "Chat OnheilAI: sesi tersimpan per akun, judul otomatis, banyak model.",
   openGraph: { title: "OnheilAI", images: ["/og.png"] },
+  icons: { icon: "/logo.png", apple: "/logo.png" },
 };
 
 export const viewport: Viewport = {

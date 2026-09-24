@@ -12,6 +12,7 @@ import { TOKEN_OPTIONS, DURATION_OPTIONS, formatTokens } from "@/lib/sub-options
 export type Me = {
   id: string;
   username: string;
+  email: string | null;
   avatar_url: string | null;
   personality: string | null;
   memory_enabled: boolean;
@@ -41,6 +42,13 @@ export default function ProfileModal({
   const [memory, setMemory] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<"" | "saved" | "failed">("");
+  // ganti password via OTP
+  const [cpOpen, setCpOpen] = useState(false);
+  const [cpCode, setCpCode] = useState("");
+  const [cpPw, setCpPw] = useState("");
+  const [cpDev, setCpDev] = useState("");
+  const [cpMsg, setCpMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [cpBusy, setCpBusy] = useState(false);
 
   // langganan + kuota
   const [quota, setQuota] = useState<{
@@ -214,6 +222,68 @@ export default function ProfileModal({
     }
   }
 
+  async function cpSend() {
+    if (cpBusy) return;
+    setCpBusy(true);
+    setCpMsg(null);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "send" }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; devCode?: string };
+      if (!res.ok) {
+        setCpMsg({
+          ok: false,
+          text:
+            body.error === "no_email"
+              ? t("auth.noEmail")
+              : body.error === "too_many_attempts"
+                ? t("auth.errRate")
+                : t("auth.errMail"),
+        });
+        return;
+      }
+      setCpDev(body.devCode ?? "");
+      setCpMsg({ ok: true, text: t("profile.cpSent") });
+    } finally {
+      setCpBusy(false);
+    }
+  }
+
+  async function cpApply() {
+    if (cpBusy) return;
+    setCpBusy(true);
+    setCpMsg(null);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: cpCode, password: cpPw }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        const map: Record<string, string> = {
+          wrong: t("auth.errWrong"),
+          expired: t("auth.errExpired"),
+          attempts: t("auth.errAttempts"),
+          too_many_attempts: t("auth.errRate"),
+          invalid_body: t("auth.errGeneric"),
+        };
+        setCpMsg({ ok: false, text: map[body.error ?? ""] ?? t("auth.errGeneric") });
+        return;
+      }
+      setCpMsg({ ok: true, text: t("profile.cpChanged") });
+      setCpOpen(false);
+      setCpCode("");
+      setCpPw("");
+      setCpDev("");
+    } finally {
+      setCpBusy(false);
+    }
+  }
+
   if (!open || !me) return null;
 
   return (
@@ -268,6 +338,93 @@ export default function ProfileModal({
               onChange={(e) => setUsername(e.target.value)}
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm text-[var(--fg)] focus:border-[var(--border-strong)]"
             />
+          </div>
+
+          <div>
+            <label htmlFor="pf-email" className="mb-1.5 block text-[13px] font-medium">
+              {t("profile.email")}
+            </label>
+            <input
+              id="pf-email"
+              readOnly
+              value={me.email ?? ""}
+              placeholder={t("profile.noEmail")}
+              className="w-full cursor-default rounded-xl border border-[var(--border)] bg-[var(--sidebar)] px-3.5 py-2.5 text-sm text-[var(--muted)]"
+            />
+            {me.email ? (
+              <div className="mt-2">
+                {cpOpen ? (
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-3.5">
+                    <p className="text-sm font-medium">{t("profile.cpTitle")}</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">{t("profile.cpHint")}</p>
+                    <div className="mt-3 space-y-2">
+                      <input
+                        value={cpCode}
+                        onChange={(e) => setCpCode(e.target.value.replace(/\D/g, ""))}
+                        maxLength={6}
+                        inputMode="numeric"
+                        placeholder={t("auth.codePh")}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 font-mono tracking-[0.4em] text-sm text-[var(--fg)] placeholder:font-sans placeholder:tracking-normal placeholder:text-[var(--muted)] focus:border-[var(--border-strong)]"
+                      />
+                      <input
+                        type="password"
+                        value={cpPw}
+                        onChange={(e) => setCpPw(e.target.value)}
+                        placeholder={t("auth.passwordHint")}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] focus:border-[var(--border-strong)]"
+                      />
+                    </div>
+                    {cpDev ? <p className="mt-2 font-mono text-[11px] text-[var(--faint)]">{t("auth.devCode", { code: cpDev })}</p> : null}
+                    {cpMsg ? (
+                      <p className={`mt-2 text-xs ${cpMsg.ok ? "text-[var(--muted)]" : "text-[var(--danger)]"}`}>{cpMsg.text}</p>
+                    ) : null}
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void cpApply()}
+                        disabled={cpBusy || !/^\d{6}$/.test(cpCode) || cpPw.length < 8}
+                        className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 disabled:opacity-45"
+                      >
+                        {t("auth.verify")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void cpSend()}
+                        disabled={cpBusy}
+                        className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:text-[var(--fg)] disabled:opacity-45"
+                      >
+                        {t("auth.resend")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCpOpen(false);
+                          setCpMsg(null);
+                        }}
+                        className="rounded-xl px-3 py-2 text-sm text-[var(--muted)] transition hover:text-[var(--fg)]"
+                      >
+                        {t("auth.back")}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--muted)]">{t("profile.cpHint")}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCpOpen(true);
+                        setCpMsg(null);
+                        void cpSend();
+                      }}
+                      className="shrink-0 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-xs font-medium text-[var(--fg)] transition hover:border-[var(--border-strong)]"
+                    >
+                      {t("profile.changePw")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div>

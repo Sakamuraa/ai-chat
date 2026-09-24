@@ -4,18 +4,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, CaretUpDown, LockSimple } from "@phosphor-icons/react";
-import { MODEL_BADGE } from "@/lib/plans";
+import { MODEL_BADGE, isPlan, allowedModels } from "@/lib/plans";
 
 export const MODELS = [
   { id: "onheil-1.1-luna", label: "Onheil 1.1 Luna" },
   { id: "onheil-1.5-selenia", label: "Onheil 1.5 Selenia" },
+  { id: "onheil-1.5-solaria", label: "Onheil 1.5 Solaria" },
   { id: "onheil-2-asteria", label: "Onheil 2 Asteria" },
+  { id: "onheil-2.5-celestia", label: "Onheil 2.5 Celestia" },
 ] as const;
 
 export function modelsFor(plan: string): ModelOption[] {
-  if (plan === "max") return [...MODELS];
-  if (plan === "pro") return MODELS.filter((m) => m.id !== "onheil-2-asteria");
-  return MODELS.filter((m) => m.id === "onheil-1.1-luna");
+  const allowed = allowedModels(isPlan(plan) ? plan : "free");
+  return MODELS.filter((m) => allowed.includes(m.id));
 }
 
 export function modelLabel(id: string): string {
