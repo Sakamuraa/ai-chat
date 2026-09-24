@@ -31,7 +31,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!sessions[0]) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   const messages = (await db()`
-    SELECT id, role, content, created_at, attachments
+    SELECT id, role, content, created_at, attachments, model
     FROM messages WHERE session_id = ${id}
     ORDER BY created_at ASC, id ASC
   `) as unknown as {
@@ -39,6 +39,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     role: "user" | "assistant";
     content: string;
     created_at: string;
+    model: string | null;
     attachments: { name: string; kind: "image" | "text"; mime: string; data: string }[] | null;
   }[];
 

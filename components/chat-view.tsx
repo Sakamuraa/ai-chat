@@ -18,13 +18,15 @@ import {
 import Markdown from "./markdown";
 import AttachmentPreview from "./attachment-preview";
 import { BrandMark } from "./sidebar";
-import ModelSelect, { MODELS, modelsFor, type ModelOption } from "./model-select";
+import ModelSelect, { MODELS, modelsFor, modelLabel as displayModel, type ModelOption } from "./model-select";
 import { useI18n } from "./i18n";
 import type { Attachment } from "@/lib/attachments";
 
 export type Msg = {
   id?: string;
   role: "user" | "assistant";
+  /** id model yang menjawab (dipakai label display) */
+  model?: string | null;
   content: string;
   attachments?: Attachment[];
 };
@@ -618,6 +620,9 @@ async function pickFiles(list: FileList | null) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <Markdown>{m.content}</Markdown>
+                      <p className="mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--faint)]">
+                        {displayModel(m.model ?? currentModel)}
+                      </p>
 
                       {i === lastAssistantIdx && !streaming ? (
                         <p className="mt-3 text-xs text-[var(--faint)]">{t("chat.disclaimer")}</p>
@@ -706,6 +711,7 @@ async function pickFiles(list: FileList | null) {
                 <div className="min-w-0 flex-1">
                   <Markdown>{streamText}</Markdown>
                   <span className="caret" aria-hidden />
+                  <p className="mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--faint)]">{modelLabel}</p>
                 </div>
               </div>
             ) : null}

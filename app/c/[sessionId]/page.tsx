@@ -38,7 +38,7 @@ export default async function SessionPage({ params }: Props) {
   }
 
   const messages = (await db()`
-    SELECT id, role, content, created_at, attachments FROM messages
+    SELECT id, role, content, created_at, attachments, model FROM messages
     WHERE session_id = ${sessionId} ORDER BY created_at ASC, id ASC
   `) as unknown as (Msg & { attachments: Attachment[] | null })[];
 

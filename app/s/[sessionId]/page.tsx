@@ -22,13 +22,14 @@ export default async function SharePage({ params }: { params: Promise<{ sessionI
   if (!sessions[0]) notFound();
 
   const messages = (await db()`
-    SELECT id, role, content, attachments
+    SELECT id, role, content, attachments, model
     FROM messages WHERE session_id = ${sessionId}
     ORDER BY created_at ASC, id ASC
   `) as unknown as {
     id: string;
     role: Msg["role"];
     content: string;
+    model: string | null;
     attachments: { name: string; kind: "image" | "text"; mime: string; data: string }[] | null;
   }[];
 
@@ -40,6 +41,7 @@ export default async function SharePage({ params }: { params: Promise<{ sessionI
       initialMessages={messages.map((m) => ({
         id: m.id,
         role: m.role,
+        model: m.model,
         content: m.content,
         attachments: slimAttachments(m.attachments),
       }))}

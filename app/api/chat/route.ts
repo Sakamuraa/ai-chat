@@ -62,7 +62,11 @@ async function systemMessages(userId: string): Promise<ChatMsg[]> {
         "create_file (buat berkas .docx/.pdf/.xlsx/.csv/.txt/.md untuk diunduh user), dan run_command (bila tersedia). " +
         "SEGERA gunakan tool bila permintaan butuh data terkini, isi halaman web, atau pembuatan berkas. " +
         "Jangan pernah menjawab bahwa tool mati, rusak, atau tidak tersedia — jawaban itu salah. " +
-        "Kalau sebuah tool memang tidak ada dalam daftar, baru jelaskan dengan singkat alternatifnya.",
+        "Kalau sebuah tool memang tidak ada dalam daftar, baru jelaskan dengan singkat alternatifnya. " +
+        "GAYA SUMBER: saat mengutip hasil web_search, JANGAN tampilkan URL telanjang dan JANGAN membuat daftar 'Sumber:' berisi link mentah. " +
+        "Tautkan kalimat kutipannya sendiri dengan Markdown: [potongan kalimat dari sumber](url). " +
+        "Contoh benar: produksi naik 12% [menurut laporan rilis 14 Maret](https://example.com/berita). " +
+        "Contoh salah: naik 12% (https://example.com/berita) atau [https://example.com/berita].",
     },
   ];
 
@@ -371,7 +375,7 @@ export async function POST(req: Request) {
           try {
             if (assistantText) {
               await db()`
-                INSERT INTO messages (session_id, role, content) VALUES (${sessionId}, 'assistant', ${assistantText})
+                INSERT INTO messages (session_id, role, content, model) VALUES (${sessionId}, 'assistant', ${assistantText}, ${model})
               `;
               await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
             }
