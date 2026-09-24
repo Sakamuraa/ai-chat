@@ -344,32 +344,57 @@ export default function Sidebar() {
     </aside>
   );
 
-  // Toggle global: tertutup -> logo OnheilAI, hover -> ikon sidebar
-  const toggle = (
-    <button
-      onClick={() => setOpen(true)}
-      aria-label={t("nav.open")}
-      title={t("nav.open")}
-      className="group fixed left-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel)] shadow-sm transition hover:border-[var(--border-strong)] md:left-4 md:top-4"
-    >
-      <span className="absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
-        <BrandMark size={22} />
-      </span>
-      <List size={17} className="relative text-[var(--muted)] opacity-0 transition group-hover:opacity-100" />
-    </button>
-  );
-
-  if (!open) return toggle;
-
+  // Panel & toggle SELALU dirender supaya transisi slide in/out jalan
+  // (bukan unmount/mount — itu yang bikin kemunculan mendadak).
   return (
     <>
-      {/* desktop: inline, bisa dilipat */}
-      <div className="hidden md:block">{panel}</div>
+      {/* Toggle global: tertutup -> logo OnheilAI, hover -> ikon sidebar */}
+      <button
+        onClick={() => setOpen(true)}
+        aria-label={t("nav.open")}
+        title={t("nav.open")}
+        className={`group fixed left-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--panel)] shadow-sm transition-all duration-300 hover:border-[var(--border-strong)] md:left-4 md:top-4 ${
+          open ? "pointer-events-none -translate-x-1 opacity-0" : "translate-x-0 opacity-100"
+        }`}
+      >
+        <span className="absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
+          <BrandMark size={22} />
+        </span>
+        <List size={17} className="relative text-[var(--muted)] opacity-0 transition group-hover:opacity-100" />
+      </button>
 
-      {/* mobile: drawer */}
-      <div className="fixed inset-0 z-40 md:hidden" onClick={closeOnMobile}>
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="absolute inset-y-0 left-0" onClick={(e) => e.stopPropagation()}>
+      {/* desktop: lebar melipat, isi digeser keluar (slide out) */}
+      <div
+        className={`hidden overflow-hidden transition-[width] duration-300 ease-out md:block ${
+          open ? "w-[264px]" : "w-0"
+        }`}
+      >
+        <div
+          className={`h-full w-[264px] transition-transform duration-300 ease-out ${
+            open ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          {panel}
+        </div>
+      </div>
+
+      {/* mobile: overlay fade + panel slide */}
+      <div
+        className={`fixed inset-0 z-40 transition-opacity duration-300 md:hidden ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={closeOnMobile}
+        aria-hidden={!open}
+      >
+        <div
+          className={`absolute inset-0 bg-black/45 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"}`}
+        />
+        <div
+          className={`absolute inset-y-0 left-0 transition-transform duration-300 ease-out ${
+            open ? "translate-x-0" : "-translate-x-full"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
           {panel}
         </div>
       </div>

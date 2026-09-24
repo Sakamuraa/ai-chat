@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { streamChat, generateTitle, type ChatMsg, type ChatPart } from "@/lib/gateway";
+import { allow, clientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -82,6 +83,15 @@ export async function POST(req: Request) {
     );
   }
   const { sessionId, model, content, regenerate, attachments } = parsed.data;
+
+  // kuota per akun (15 chat / 10 mnt) dan per IP (30 / 10 mnt) — pembatas terakhir
+  // setelah gerbang same-origin, supaya kunci gateway tak bisa dikuras skrip.
+  if (!allow(`chat-user:${user.id}`, 15) || !allow(`chat-ip:${clientIp(req.headers)}`, 30)) {
+    return NextResponse.json(
+      { error: "rate_limited", detail: "Terlalu banyak permintaan. Tunggu beberapa menit." },
+      { status: 429 },
+    );
+  }
 
   const abort = new AbortController();
   req.signal.addEventListener("abort", () => abort.abort(), { once: true });

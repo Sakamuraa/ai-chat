@@ -1,12 +1,26 @@
-// language: TypeScript, file: proxy.ts, target: Next.js 16 edge guard (cuma cek keberadaan cookie)
+// language: TypeScript, file: proxy.ts, target: Next.js 16 edge guard
 // *Next 16: konvensi middleware diganti proxy — validasi sesi SEBENARNYA di route handler / server component*
+// Lapisan 1: API yang menulis data hanya boleh dipanggil dari halaman sendiri (same-origin).
+// Lapisan 2: cookie wajib untuk rute terproteksi (cuma keberadaan; validasi sesi di handler).
 import { NextResponse, type NextRequest } from "next/server";
+import { checkSameOrigin } from "@/lib/request-guard";
 
 const PROTECTED_PREFIX = ["/c/", "/api/chat", "/api/sessions"];
 const PUBLIC_API = ["/api/auth/"];
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // --- gerbang same-origin: /api/chat, /api/sessions, /api/me, /api/auth/* yang menulis data
+  if (pathname.startsWith("/api/") && WRITE_METHODS.has(req.method)) {
+    const verdict = checkSameOrigin(req.headers);
+    if (!verdict.ok) {
+      console.warn(`[guard] 403 ${req.method} ${pathname} dari pemblokiran: ${verdict.reason}`);
+      return NextResponse.json({ error: "forbidden", detail: "origin" }, { status: 403 });
+    }
+  }
+
   const isProtected = PROTECTED_PREFIX.some((p) => pathname.startsWith(p));
   if (!isProtected) return NextResponse.next();
 
@@ -26,5 +40,6 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/c/:path*", "/api/chat/:path*", "/api/sessions/:path*"],
+  // matcher diperluas supaya gerbang same-origin ikut menutup /api/auth dan /api/me
+  matcher: ["/c/:path*", "/api/:path*"],
 };

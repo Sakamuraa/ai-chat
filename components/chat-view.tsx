@@ -205,8 +205,12 @@ export default function ChatView({ sessionId, title, model, initialMessages }: P
       });
 
       if (!res.ok || !res.body) {
-        const body = (await res.json().catch(() => ({}))) as { detail?: string };
-        setError(body.detail ? `${body.detail}` : `Error ${res.status}`);
+        const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+        if (body.error === "rate_limited") {
+          setError(t("chat.rateLimited"));
+        } else {
+          setError(body.detail ? `${body.detail}` : `Error ${res.status}`);
+        }
         return;
       }
 
