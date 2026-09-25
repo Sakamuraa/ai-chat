@@ -142,7 +142,9 @@ export async function POST(req: Request) {
   `) as unknown as { id: string; title: string }[];
   if (!sessions[0]) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const userText = withTextAttachments(content, attachments ?? []);
+  // Tersimpan TANPA teks lampiran (permintaan Manuel): bubble user hanya menampilkan yang diketik.
+  // Isi dokumen dipasang ulang saat membangun riwayat untuk model (lihat bawah).
+  const userText = content;
   const images = (attachments ?? []).filter((a) => a.kind === "image");
 
   // 2. simpan pesan user
@@ -197,7 +199,15 @@ export async function POST(req: Request) {
     LIMIT 200
   `) as unknown as { role: ChatMsg["role"]; content: string; attachments: unknown }[];
 
-  const turns: ChatMsg[] = history.map((m) => ({ role: m.role, content: m.content }));
+  const turns: ChatMsg[] = history.map((m) => {
+    if (m.role !== "user") return { role: m.role, content: m.content };
+    const atts = Array.isArray(m.attachments)
+      ? (m.attachments as { name: string; kind: "image" | "text"; mime: string; data: string }[])
+      : [];
+    // pesan lama tersimpan sudah berisi blok lampiran -> jangan dobel
+    const already = m.content.includes("\n\n---\n\nLampiran ");
+    return { role: m.role, content: already ? m.content : withTextAttachments(m.content, atts) };
+  });
 
   // gambar hanya untuk giliran ini (tidak disimpan ke DB supaya tidak membengkak)
   // PagU: upstream multimodal gagal membaca base64 besar (terpotong -> "gambar rusak").
