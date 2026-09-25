@@ -69,6 +69,10 @@ async function systemMessages(userId: string): Promise<ChatMsg[]> {
         "SEGERA gunakan tool bila permintaan butuh data terkini, isi halaman web, atau pembuatan berkas. " +
         "Jangan pernah menjawab bahwa tool mati, rusak, atau tidak tersedia — jawaban itu salah. " +
         "Kalau sebuah tool memang tidak ada dalam daftar, baru jelaskan dengan singkat alternatifnya. " +
+        "PRIORITAS HASIL TOOL: balasan web_search/web_extract LEBIH OTORITATIF daripada ingatanmu. " +
+        "Kalau hasil tool menyatakan hal yang lebih baru atau berbeda dari pengetahuanmu (status rilis, versi, harga, roster), " +
+        "pakai hasil tool WAJIB dan sebutkan sumbernya. Jangan pernah menjawab \"belum rilis / belum ada info\" " +
+        "bila hasil tool justru menunjukkan sebaliknya — itu jawaban salah. " +
         "GAYA SUMBER: saat mengutip hasil web_search, JANGAN tampilkan URL telanjang dan JANGAN membuat daftar 'Sumber:' berisi link mentah. " +
         "Tautkan kalimat kutipannya sendiri dengan Markdown: [potongan kalimat dari sumber](url). " +
         "Contoh benar: produksi naik 12% [menurut laporan rilis 14 Maret](https://example.com/berita). " +

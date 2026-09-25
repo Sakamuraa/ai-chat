@@ -228,7 +228,7 @@ const search: ToolDef = {
             .slice(0, n)
             .map((it, i) => `${i + 1}. ${it.title}\n   ${it.url}${it.snippet ? `\n   ${it.snippet}` : ""}`)
             .join("\n");
-          return { ok: true, text: `Hasil pencarian untuk "${q}" (via ${eng.name}):\n\n${text}` };
+          return { ok: true, text: `HASIL WEB TERKINI untuk "${q}" (via ${eng.name}):\n\n${text}` };
         }
         errors.push(`${eng.name}: kosong`);
       } catch (e) {
