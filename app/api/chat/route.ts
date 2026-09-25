@@ -64,6 +64,9 @@ async function systemMessages(userId: string): Promise<ChatMsg[]> {
           ? `Gaya jawaban yang diminta user: ${u.personality.trim()}\n\n`
           : "") +
         `Kamu sedang melayani username "${u.username}" di OnheilAI. Jawab dalam bahasa percakapan user.\n\n` +
+        "ATURAN WAJIB: untuk pertanyaan riset/fakta/berita/panduan/rekomendasi (termasuk build game, produk, harga, rilis), " +
+        "KAMU HARUS memanggil web_search minimal sekali SEBELUM menjawab. " +
+        "Jangan pernah menjawab dari ingatan dulu, dan jangan pernah bilang tool tidak ada/tidak bisa dipakai sebelum mencobanya.\n\n" +
         "Kamu PUNYA tool di antarmuka ini: web_search (cari di internet), web_extract (baca isi URL), " +
         "create_file (buat berkas .docx/.pdf/.xlsx/.csv/.txt/.md untuk diunduh user), dan run_command (bila tersedia). " +
         "SEGERA gunakan tool bila permintaan butuh data terkini, isi halaman web, atau pembuatan berkas. " +
@@ -273,6 +276,7 @@ export async function POST(req: Request) {
   const calls: { id: string; name: string; args: string }[] = [];
   let rounds = 0;
   let emptyRetries = 0; // jawaban kosong -> paksa ulang (maksimal 2x)
+  const lastResults: string[] = []; // teks hasil tool -> disisipkan lagi sebelum putaran final
   // pemakaian token sesungguhnya dari gateway (bukan perkiraan teks)
   let usageTotal = 0; // akumulasi antar-putaran (ronde tool = request terpisah)
   let usageStream = 0; // tertinggi pada satu stream (event usage boleh berulang)
@@ -377,8 +381,22 @@ export async function POST(req: Request) {
                 content: results[i].ok ? results[i].text : `ERROR: ${results[i].error}`,
               })),
             ];
+            for (const res of results) if (res.ok && res.text) lastResults.push(res.text);
             flushUsage(); // putaran selesai -> akumulasi usage-nya
             // ronde terakhir: TANPA tools supaya model wajib menjawab
+            if (rounds >= 2 && lastResults.length > 0) {
+              // D2: hasil tool diulang sebagai konteks eksplisit — model free-tier
+              // sering menganggap role:tool kosong, padahal datanya sudah ada
+              conv = [
+                ...conv,
+                {
+                  role: "system" as const,
+                  content:
+                    "RINGKASAN HASIL WEB (pakai ini untuk menjawab, jangan bilang hasil kosong):\n\n" +
+                    lastResults.join("\n\n").slice(0, 9000),
+                },
+              ];
+            }
             gateway = rounds >= 2
               ? await streamChat(model, conv, abort.signal)
               : await streamChat(model, conv, abort.signal, tools);
