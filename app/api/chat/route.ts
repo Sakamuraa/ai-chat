@@ -249,6 +249,13 @@ export async function POST(req: Request) {
   let finish: string | null = null;
   const calls: { id: string; name: string; args: string }[] = [];
   let rounds = 0;
+  // pemakaian token sesungguhnya dari gateway (bukan perkiraan teks)
+  let usageTotal = 0; // akumulasi antar-putaran (ronde tool = request terpisah)
+  let usageStream = 0; // tertinggi pada satu stream (event usage boleh berulang)
+  const flushUsage = () => {
+    usageTotal += usageStream;
+    usageStream = 0;
+  };
 
   const parseData = (payload: string) => {
     if (!payload || payload === "[DONE]") return;
@@ -261,7 +268,16 @@ export async function POST(req: Request) {
           };
           finish_reason?: string;
         }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
       };
+      const u = obj.usage;
+      if (u) {
+        const s =
+          typeof u.total_tokens === "number"
+            ? u.total_tokens
+            : (u.prompt_tokens ?? 0) + (u.completion_tokens ?? 0);
+        if (Number.isFinite(s) && s > usageStream) usageStream = s;
+      }
       const ch = obj.choices?.[0];
       if (!ch) return;
       if (ch.finish_reason) finish = ch.finish_reason;
@@ -337,6 +353,7 @@ export async function POST(req: Request) {
                 content: results[i].ok ? results[i].text : `ERROR: ${results[i].error}`,
               })),
             ];
+            flushUsage(); // putaran selesai -> akumulasi usage-nya
             // ronde terakhir: TANPA tools supaya model wajib menjawab
             gateway = rounds >= 4
               ? await streamChat(model, conv, abort.signal)
@@ -354,6 +371,7 @@ export async function POST(req: Request) {
             lineBuf = "";
             calls.length = 0;
             try {
+              flushUsage();
               gateway = await streamChat(model, [
                 ...conv,
                 { role: "user", content: "Jawab sekarang, langsung ke inti tanpa tool." },
@@ -379,7 +397,12 @@ export async function POST(req: Request) {
               `;
               await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
             }
-            await addUsage(user.id, estimateTokens(assistantText) + estimateTokens(userText));
+            flushUsage();
+            // angka sesungguhnya dari gateway (prompt+riwayat+reasoning) bila tersedia;
+            // kalau tidak, perkiraan dari teks yang terlihat
+            const counted =
+              usageTotal > 0 ? usageTotal : estimateTokens(assistantText) + estimateTokens(userText);
+            await addUsage(user.id, counted);
             if (needsTitle) {
               const title = await Promise.race([titlePromise, sleep(5000).then(() => "")]);
               if (title) {
