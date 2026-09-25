@@ -194,56 +194,6 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-/** Kecilkan gambar di sisi klien sampai pasti muat TARGET (default 1,2 jt karakter base64).
- *  Upstream multimodal memotong base64 besar -> model bilang "gambar rusak"; sekarang
- *  dimensi dan kualitas diturunkan bertahap (1600 -> 800 px, q 0.8 -> 0.4) sampai muat. */
-async function compressImage(file: File): Promise<string> {
-  const TARGET = 1_200_000;
-  const read = (f: File) =>
-    new Promise<string>((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(String(r.result));
-      r.onerror = () => rej(r.error);
-      r.readAsDataURL(f);
-    });
-  const dataUrl = await read(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = () => rej(new Error("gagal_baca_gambar"));
-      i.src = dataUrl;
-    });
-    if (dataUrl.length <= TARGET) return dataUrl;
-    for (const maxSide of [1600, 1280, 1024, 800]) {
-      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.max(1, Math.round(img.naturalWidth * scale));
-      const h = Math.max(1, Math.round(img.naturalHeight * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) break;
-      ctx.drawImage(img, 0, 0, w, h);
-      for (const q of [0.8, 0.65, 0.5, 0.4]) {
-        const out = canvas.toDataURL("image/jpeg", q);
-        if (out.startsWith("data:image/jpeg;base64,") && out.length <= TARGET) return out;
-      }
-    }
-    const scale = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
-    const last = document.createElement("canvas");
-    last.width = Math.max(1, Math.round(img.naturalWidth * scale));
-    last.height = Math.max(1, Math.round(img.naturalHeight * scale));
-    const ctx2 = last.getContext("2d");
-    if (ctx2) {
-      ctx2.drawImage(img, 0, 0, last.width, last.height);
-      return last.toDataURL("image/jpeg", 0.4);
-    }
-    return dataUrl;
-  } catch {
-    return dataUrl;
-  }
-}
 
 async function pickFiles(list: FileList | null) {
     if (!list) return;
@@ -259,7 +209,7 @@ async function pickFiles(list: FileList | null) {
         continue;
       }
       setError("");
-      const { upscaleTiny } = await import("@/lib/attachments");
+      const { compressImage, upscaleTiny } = await import("@/lib/attachments");
       const data = cls === "image" ? await upscaleTiny(await compressImage(file)) : await file.text();
       setAttachments((prev) =>
         prev.length >= 6

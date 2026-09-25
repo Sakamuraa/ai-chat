@@ -86,15 +86,10 @@ export default function Landing({ username }: { username: string }) {
       const data =
         cls === "image"
           ? await (async () => {
-              const raw = await new Promise<string>((res, rej) => {
-                const r = new FileReader();
-                r.onload = () => res(String(r.result));
-                r.onerror = () => rej(r.error);
-                r.readAsDataURL(file);
-              });
-              // gambar kecil dinaikkan dulu (upstream vision buta di bawah ~64px)
-              const { upscaleTiny } = await import("@/lib/attachments");
-              return upscaleTiny(raw);
+              // kecilkan dulu (foto besar >1,5 jt karakter dilepas server -> model minta kirim ulang)
+              // lalu gambar kecil dinaikkan (upstream vision buta di bawah ~64px)
+              const { compressImage, upscaleTiny } = await import("@/lib/attachments");
+              return upscaleTiny(await compressImage(file));
             })()
           : await file.text();
       setAttachments((prev) =>

@@ -78,3 +78,54 @@ export async function upscaleTiny(dataUrl: string, minSide = 128): Promise<strin
     return dataUrl;
   }
 }
+
+/** Kecilkan gambar sisi klien sampai pasti muat TARGET (1,2 jt karakter base64).
+ *  Dulu cuma chat-view yang memakai; halaman landing mengirim mentah -> foto 2,6 MB
+ *  jadi ~3,5 jt karakter, lewat batas server (1,5 jt) -> gambar dilepas dan model
+ *  menjawab "kirim gambarnya" (laporan Manuel, 2026-09-26). Kini dua pintu sama. */
+export async function compressImage(file: File): Promise<string> {
+  const TARGET = 1_200_000;
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+  if (typeof document === "undefined") return dataUrl;
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error("gagal_baca_gambar"));
+      i.src = dataUrl;
+    });
+    if (dataUrl.length <= TARGET) return dataUrl;
+    for (const maxSide of [1600, 1280, 1024, 800]) {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) break;
+      ctx.drawImage(img, 0, 0, w, h);
+      for (const q of [0.8, 0.65, 0.5, 0.4]) {
+        const out = canvas.toDataURL("image/jpeg", q);
+        if (out.startsWith("data:image/jpeg;base64,") && out.length <= TARGET) return out;
+      }
+    }
+    const scale = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const last = document.createElement("canvas");
+    last.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    last.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx2 = last.getContext("2d");
+    if (ctx2) {
+      ctx2.drawImage(img, 0, 0, last.width, last.height);
+      return last.toDataURL("image/jpeg", 0.4);
+    }
+    return dataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
