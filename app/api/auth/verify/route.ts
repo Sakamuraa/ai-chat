@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { createSessionToken, issueSessionCookie } from "@/lib/auth";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { verifyOtp } from "@/lib/otp";
 
@@ -32,6 +32,6 @@ export async function POST(req: Request) {
 
   const token = await createSessionToken(rows[0].id);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+  await issueSessionCookie(res, token, rows[0].id);
   return res;
 }

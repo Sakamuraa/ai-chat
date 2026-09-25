@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "./db";
-import { createSessionToken, hashPassword, SESSION_COOKIE, sessionCookieOptions } from "./auth";
+import { createSessionToken, hashPassword, issueSessionCookie } from "./auth";
 
 export type Provider = "google" | "discord";
 
@@ -203,7 +203,7 @@ export async function finishOAuth(p: Provider, req: Request, origin: string): Pr
     const userId = await upsertUser(p, prof);
     const token = await createSessionToken(userId);
     const res = NextResponse.redirect(new URL("/", origin), 302);
-    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    await issueSessionCookie(res, token, userId);
     res.cookies.delete(STATE_COOKIE);
     return res;
   } catch (e) {

@@ -36,7 +36,7 @@ function DiscordIcon() {
   );
 }
 
-export default function AuthForm({ mode }: { mode: "login" | "register" }) {
+export default function AuthForm({ mode, switching = false }: { mode: "login" | "register"; switching?: boolean }) {
   const router = useRouter();
   const { t } = useI18n();
 
@@ -513,6 +513,17 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
                 </>
               )}
             </p>
+
+            {switching ? (
+              <p className="mt-4 text-center">
+                <Link
+                  href="/"
+                  className="text-sm text-[var(--muted)] underline underline-offset-4 transition hover:text-[var(--fg)]"
+                >
+                  {t("auth.cancelSwitch")}
+                </Link>
+              </p>
+            ) : null}
           </>
         )}
       </form>

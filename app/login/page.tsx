@@ -6,8 +6,14 @@ import AuthForm from "@/components/auth-form";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Masuk" };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { from?: string } | Promise<{ from?: string }>;
+}) {
+  const params = (await Promise.resolve(searchParams)) ?? {};
   const user = await getSessionUser();
-  if (user) redirect("/");
-  return <AuthForm mode="login" />;
+  // dari menu "Tambah akun": biarkan terbuka walau masih login (sesi lama tak disentuh)
+  if (user && params.from !== "switch") redirect("/");
+  return <AuthForm mode="login" switching={params.from === "switch"} />;
 }
