@@ -44,6 +44,19 @@ type Props = {
 
 type UiAttachment = Attachment;
 
+/** "membaca https://game8.co/games/..." -> "membaca game8.co" (baris tetap satu) */
+function shortStepLabel(label: string): string {
+  const m = label.match(/^(.*?)(https?:\/\/\S+)/);
+  if (!m) return label;
+  let host = "";
+  try {
+    host = new URL(m[2]).hostname.replace(/^www\./, "");
+  } catch {
+    host = "…";
+  }
+  return `${m[1].trimEnd()} ${host}`;
+}
+
 export default function ChatView({ sessionId, title, model, initialMessages, readOnly = false, owner = false }: Props) {
   const router = useRouter();
   const { t } = useI18n();
@@ -54,6 +67,8 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [streamText, setStreamText] = useState("");
   // langkah tool (mencari / membaca / membuat berkas) selama stream berjalan
   const [toolSteps, setToolSteps] = useState<{ label: string; status: string }[]>([]);
+  // satu baris (gaya Gemini/Kimi): teks langkahnya yang berganti dengan animasi
+  const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState("");
   const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
   // model terakhir dipilih disimpan di localStorage supaya halaman sesi tak kembali ke model awal
@@ -146,6 +161,21 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
     const iv = setInterval(() => setHintIdx((i) => (i + 1) % 4), 1900);
     return () => clearInterval(iv);
   }, [streaming, streamText]);
+
+  // langkah tool: ganti teks tiap 1,3 detik selama stream, berhenti di langkah terakhir
+  useEffect(() => {
+    if (toolSteps.length === 0) {
+      setStepIdx(0);
+      return;
+    }
+    if (!streaming) {
+      setStepIdx(toolSteps.length - 1);
+      return;
+    }
+    setStepIdx((i) => Math.min(i, toolSteps.length - 1));
+    const iv = setInterval(() => setStepIdx((i) => (i + 1) % toolSteps.length), 1300);
+    return () => clearInterval(iv);
+  }, [toolSteps.length, streaming]);
 
   // draft dari halaman awal (chat pertama) — dilewati di mode hanya-baca
   useEffect(() => {
@@ -664,30 +694,23 @@ async function pickFiles(list: FileList | null) {
               </div>
             ))}
 
-            {toolSteps.length > 0 ? (
-              <div className="mb-5 flex flex-wrap gap-2">
-                {toolSteps.map((s, i) => (
-                  <span
-                    key={`${s.label}-${i}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1 text-[11px] text-[var(--muted)]"
-                  >
-                    <span
-                      aria-hidden
-                      className={
-                        s.status === "gagal"
-                          ? "text-[var(--danger)]"
-                          : s.status === "selesai"
-                            ? "text-[var(--accent)]"
-                            : "animate-pulse text-[var(--accent)]"
-                      }
-                    >
-                      ●
-                    </span>
-                    {s.label}
+            {toolSteps.length > 0 ? (() => {
+              const st = toolSteps[Math.min(stepIdx, toolSteps.length - 1)];
+              const dot =
+                st.status === "gagal"
+                  ? "text-[var(--danger)]"
+                  : st.status === "selesai"
+                    ? "text-[var(--accent)]"
+                    : "animate-pulse text-[var(--accent)]";
+              return (
+                <div key={stepIdx} className="fade-up mb-5 flex items-center gap-2">
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                    <span aria-hidden className={dot}>●</span>
+                    <span className="truncate">{shortStepLabel(st.label)}</span>
                   </span>
-                ))}
-              </div>
-            ) : null}
+                </div>
+              );
+            })() : null}
 
             {streaming && !streamText ? (
               <div className="mb-7 flex items-start gap-3.5">

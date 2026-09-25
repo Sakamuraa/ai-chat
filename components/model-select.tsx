@@ -44,8 +44,10 @@ export default function ModelSelect({
   lockedIds?: readonly string[];
 }) {
   const [open, setOpen] = useState(false);
-  // posisi menu dihitung ulang terhadap viewport — layar HP sempit: popup tidak boleh terpotong
-  const [geo, setGeo] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null);
+  // offset horizontal (koordinat lokal terhadap tombol) supaya menu tak keluar layar.
+  // HARUS absolut: `fixed` salah posisi di dalam kontainer ber-animasi transform
+  // (leluhur jadi acuan koordinat) -> menu melayang / hilang dari layar.
+  const [geo, setGeo] = useState<{ left: number; width: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const current = modelLabel(value);
   const currentValueBadge = MODEL_BADGE[value] ?? "";
@@ -62,13 +64,11 @@ export default function ModelSelect({
       if (!r) return setGeo(null);
       const vw = window.innerWidth;
       const width = Math.min(262, Math.max(200, vw - 16));
-      // tengahkan menu pada tombol, lalu dijepit agar tak keluar layar
-      const left = Math.min(Math.max(8, r.left + r.width / 2 - width / 2), Math.max(8, vw - width - 8));
-      const v =
-        direction === "up"
-          ? { bottom: Math.max(8, window.innerHeight - r.top + 8) }
-          : { top: Math.max(8, r.bottom + 8) };
-      setGeo({ left, width, ...v });
+      const desired = r.width - width;        // default: rapat ke ujung kanan tombol
+      const minL = 8 - r.left;                // jarak aman dari tepi kiri layar
+      const maxL = vw - 8 - width - r.left;   // jarak aman dari tepi kanan layar
+      const left = maxL <= minL ? Math.min(desired, minL) : Math.min(Math.max(desired, minL), maxL);
+      setGeo({ left, width });
     };
     apply();
     // bilah alamat HP berubah tinggi saat scroll -> posisi dihitung ulang
@@ -114,16 +114,12 @@ export default function ModelSelect({
       {open ? (
         <div
           role="listbox"
-          className={`fade-up z-50 max-h-[60dvh] overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)] [touch-action:manipulation] ${
-            geo ? "fixed" : "absolute right-0 w-[262px]"
+          className={`fade-up absolute z-50 max-h-[60dvh] overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28)] [touch-action:manipulation] ${
+            geo ? "" : "right-0 w-[262px]"
           } ${
             direction === "up" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"
           }`}
-          style={
-            geo
-              ? { position: "fixed", left: geo.left, width: geo.width, top: geo.top, bottom: geo.bottom }
-              : undefined
-          }
+          style={geo ? { left: geo.left, width: geo.width } : undefined}
         >
           {models.map((m) => {
             const active = m.id === value;
