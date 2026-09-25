@@ -103,7 +103,7 @@ export function AccountModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center pb-12 sm:items-center sm:pb-12"
       role="dialog"
       aria-modal="true"
       aria-label={t("account.title")}

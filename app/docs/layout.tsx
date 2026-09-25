@@ -15,7 +15,9 @@ const NAV = [
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-[100dvh] bg-[var(--bg)] text-[var(--fg)]">
+    // shell root memakai h-dvh + overflow-hidden (khas app chat), jadi halaman bantuan
+    // wajib membawa wadah scroll sendiri agar konten panjang bisa digulir, terutama di HP.
+    <div className="h-full overflow-y-auto overscroll-contain bg-[var(--bg)] text-[var(--fg)]">
       <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--bg)]/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-[1100px] items-center gap-6 px-5">
           <Link href="/" className="flex items-center gap-2.5">
