@@ -260,7 +260,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // putaran tool: kalau model meminta tool, jalankan dulu lalu stream lagi (maksimal 4 ronde)
+  // putaran tool: kalau model meminta tool, jalankan dulu lalu stream lagi (maksimal 2 ronde (4 pencarian))
   let conv: ChatMsg[] = messages;
 
   let reader = gateway.body!.getReader();
@@ -344,7 +344,7 @@ export async function POST(req: Request) {
           if (!done) continue;
 
           const valid = calls.filter((c) => Boolean(c && c.name));
-          if (finish === "tool_calls" && valid.length > 0 && rounds < 4) {
+          if (finish === "tool_calls" && valid.length > 0 && rounds < 2) { // maks 2 ronde = 4 pencarian (permintaan Manuel: 8 terlalu lama & bikin jawaban jelek)
             rounds++;
             allText += roundText;
             roundText = "";
@@ -379,7 +379,7 @@ export async function POST(req: Request) {
             ];
             flushUsage(); // putaran selesai -> akumulasi usage-nya
             // ronde terakhir: TANPA tools supaya model wajib menjawab
-            gateway = rounds >= 4
+            gateway = rounds >= 2
               ? await streamChat(model, conv, abort.signal)
               : await streamChat(model, conv, abort.signal, tools);
             reader = gateway.body!.getReader();

@@ -203,7 +203,7 @@ const search: ToolDef = {
     type: "object",
     properties: {
       query: { type: "string", description: "Kata kunci pencarian" },
-      n: { type: "integer", minimum: 1, maximum: 8, description: "Jumlah hasil (default 5)" },
+      n: { type: "integer", minimum: 1, maximum: 4, description: "Jumlah hasil per pencarian (maksimal 4)" },
     },
     required: ["query"],
   },
@@ -211,7 +211,7 @@ const search: ToolDef = {
   execute: async (args): Promise<ToolResult> => {
     const q = String(args.query ?? "").trim();
     if (!q) return { ok: false, error: "query kosong" };
-    const n = Math.min(8, Math.max(1, Number(args.n) || 5));
+    const n = Math.min(4, Math.max(1, Number(args.n) || 4)); // maksimal 4 (permintaan Manuel)
     // rantai: Bing (stabil) -> DuckDuckGo (html, lalu lite) -> Wikipedia
     const engines: { name: string; run: () => Promise<Item[]> }[] = [
       { name: "bing", run: () => searchBing(q, n) },
