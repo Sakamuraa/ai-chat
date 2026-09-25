@@ -44,6 +44,12 @@ const MODELS: ModelInfo[] = [
       "Model terbaru dan terkuat di lini Onheil. Konteks panjang, instruksi panjang, dan hasil paling konsisten.",
     cocok: "Tugas kompleks dengan banyak aturan, dokumen panjang, dan pekerjaan penting.",
   },
+  {
+    id: "onheil-3-istaroth",
+    ringkas:
+      "Model generasi ketiga OnheilAI. Menyatu dengan pencarian web bawaan, jadi jawabannya selalu membawa data terkini tanpa menunggu tool tambahan.",
+    cocok: "Riset terkini, perbandingan produk, berita, dan pertanyaan yang butuh fakta hari ini.",
+  },
 ];
 
 const KEMAMPUAN = [

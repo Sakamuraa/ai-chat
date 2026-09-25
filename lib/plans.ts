@@ -3,7 +3,7 @@
  * Paket (permintaan Manuel, 2026-09-24):
  *   free -> onheil-1.1-luna
  *   pro  -> + onheil-1.5-selenia
- *   max  -> + onheil-2-asteria (Onheil 2 Asteria)
+ *   max  -> + onheil-2-asteria, onheil-2.5-celestia, onheil-3-istaroth (permintaan Manuel, 2026-09-25)
  * Paket efektif = paket dari langganan aktif, kalau tidak ada -> paket bawaan akun.
  */
 export type Plan = "free" | "pro" | "max";
@@ -20,6 +20,7 @@ export const MODEL_LABELS: Record<string, string> = {
   "onheil-1.5-solaria": "Onheil 1.5 Solaria",
   "onheil-2-asteria": "Onheil 2 Asteria",
   "onheil-2.5-celestia": "Onheil 2.5 Celestia",
+  "onheil-3-istaroth": "Onheil 3 Istaroth",
 };
 
 const RANK: Record<Plan, number> = { free: 0, pro: 1, max: 2 };
@@ -33,6 +34,7 @@ export const PLAN_MODELS: Record<Plan, string[]> = {
     "onheil-1.5-solaria",
     "onheil-2-asteria",
     "onheil-2.5-celestia",
+    "onheil-3-istaroth",
   ],
 };
 
@@ -73,4 +75,5 @@ export const MODEL_BADGE: Record<string, string> = {
   "onheil-1.5-solaria": "Pro",
   "onheil-2-asteria": "Max",
   "onheil-2.5-celestia": "Max",
+  "onheil-3-istaroth": "Max",
 };

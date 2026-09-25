@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { allowedModels, effectivePlan, modelAllowed, PLAN_MODELS } from "./plans";
 
 describe("paket model", () => {
-  it("free hanya 1.1; pro menambah 1.5 selenia+solaria; max menambah asteria+celestia", () => {
+  it("free hanya 1.1; pro menambah 1.5 selenia+solaria; max menambah asteria+celestia+istaroth", () => {
     expect(PLAN_MODELS.free).toEqual(["onheil-1.1-luna"]);
     expect(PLAN_MODELS.pro).toEqual(["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-1.5-solaria"]);
     expect(PLAN_MODELS.max).toEqual([
@@ -12,6 +12,7 @@ describe("paket model", () => {
       "onheil-1.5-solaria",
       "onheil-2-asteria",
       "onheil-2.5-celestia",
+      "onheil-3-istaroth",
     ]);
   });
 
