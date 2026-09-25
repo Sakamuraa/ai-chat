@@ -5,17 +5,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  CaretRight,
   ChatsCircle,
-  Gear,
   List,
   MagnifyingGlass,
   PencilSimple,
   Plus,
-  SignOut,
   Trash,
   X,
 } from "@phosphor-icons/react";
 import { useI18n } from "./i18n";
+import { AccountModal } from "./account-modal";
 
 type Session = {
   id: string;
@@ -80,6 +80,9 @@ export default function Sidebar() {
   const [query, setQuery] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [auth, setAuth] = useState<"unknown" | "in" | "out">("unknown");
+  // modal akun (permintaan Manuel, 2026-09-26): klik profil -> popup menu akun
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [meName, setMeName] = useState("");
   // tekan-tahan sesi (mobile) -> modal opsi
   const [held, setHeld] = useState<Session | null>(null);
   const holdTimer = useRef<number | null>(null);
@@ -108,6 +111,12 @@ export default function Sidebar() {
       setSessions(body.sessions);
       setAuth("in");
       setLoaded(true);
+      fetch("/api/me")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((b: { user?: { username?: string } } | null) => {
+          if (b?.user?.username) setMeName(b.user.username);
+        })
+        .catch(() => undefined);
     } catch {
       setAuth("out");
       setLoaded(true);
@@ -350,21 +359,24 @@ export default function Sidebar() {
       </nav>
 
       {auth === "in" ? (
-        <div className="flex items-center gap-1 border-t border-[var(--border)] px-3 py-3">
+        <div className="border-t border-[var(--border)] px-3 py-3">
           <button
-            onClick={openProfile}
-            className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--border)]/60 hover:text-[var(--fg)]"
+            onClick={() => setAccountOpen(true)}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition hover:bg-[var(--border)]/60"
+            aria-haspopup="dialog"
           >
-            <Gear size={15} />
-            {t("nav.settings")}
-          </button>
-          <button
-            onClick={logout}
-            title={t("nav.logout")}
-            aria-label={t("nav.logout")}
-            className="rounded-xl p-2 text-[var(--muted)] transition hover:bg-[var(--border)]/60 hover:text-[var(--fg)]"
-          >
-            <SignOut size={15} />
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--border)] text-xs font-semibold text-[var(--fg)]">
+              {(meName.trim()[0] || "O").toUpperCase()}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-[var(--fg)]">
+                {meName || "Akun"}
+              </span>
+              <span className="block truncate text-[11px] text-[var(--faint)]">
+                {t("account.title")}
+              </span>
+            </span>
+            <CaretRight size={13} className="shrink-0 text-[var(--faint)]" />
           </button>
         </div>
       ) : null}
@@ -490,5 +502,11 @@ export default function Sidebar() {
         </div>
       </div>
       {sessionMenu}
+      <AccountModal
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        onSettings={openProfile}
+        onLogout={logout}
+      />
     </>
   );}
