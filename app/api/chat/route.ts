@@ -249,6 +249,7 @@ export async function POST(req: Request) {
   let finish: string | null = null;
   const calls: { id: string; name: string; args: string }[] = [];
   let rounds = 0;
+  let emptyRetries = 0; // jawaban kosong -> paksa ulang (maksimal 2x)
   // pemakaian token sesungguhnya dari gateway (bukan perkiraan teks)
   let usageTotal = 0; // akumulasi antar-putaran (ronde tool = request terpisah)
   let usageStream = 0; // tertinggi pada satu stream (event usage boleh berulang)
@@ -364,8 +365,9 @@ export async function POST(req: Request) {
 
           let assistantText = (allText + roundText).trim();
 
-          // kosong setelah putaran tool -> paksa sekali lagi tanpa tools
-          if (!assistantText) {
+          // kosong -> paksa ulang tanpa tools; 2 percobaan (uji: konten kosong ~17% utk gambar)
+          if (!assistantText && emptyRetries < 2) {
+            emptyRetries++;
             roundText = "";
             finish = null;
             lineBuf = "";

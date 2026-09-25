@@ -229,7 +229,8 @@ async function pickFiles(list: FileList | null) {
         continue;
       }
       setError("");
-      const data = cls === "image" ? await compressImage(file) : await file.text();
+      const { upscaleTiny } = await import("@/lib/attachments");
+      const data = cls === "image" ? await upscaleTiny(await compressImage(file)) : await file.text();
       setAttachments((prev) =>
         prev.length >= 6
           ? prev

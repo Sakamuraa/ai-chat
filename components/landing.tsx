@@ -85,12 +85,17 @@ export default function Landing({ username }: { username: string }) {
       setError("");
       const data =
         cls === "image"
-          ? await new Promise<string>((res, rej) => {
-              const r = new FileReader();
-              r.onload = () => res(String(r.result));
-              r.onerror = () => rej(r.error);
-              r.readAsDataURL(file);
-            })
+          ? await (async () => {
+              const raw = await new Promise<string>((res, rej) => {
+                const r = new FileReader();
+                r.onload = () => res(String(r.result));
+                r.onerror = () => rej(r.error);
+                r.readAsDataURL(file);
+              });
+              // gambar kecil dinaikkan dulu (upstream vision buta di bawah ~64px)
+              const { upscaleTiny } = await import("@/lib/attachments");
+              return upscaleTiny(raw);
+            })()
           : await file.text();
       setAttachments((prev) =>
         prev.length >= 6
