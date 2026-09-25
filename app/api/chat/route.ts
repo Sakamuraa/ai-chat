@@ -9,6 +9,7 @@ import { checkQuota, estimateTokens } from "@/lib/quota";
 import { modelAllowed } from "@/lib/plans";
 import { addUsage, quotaState } from "@/lib/subscriptions";
 import { runTool, toolLabel, toolSchemas, type ToolResult } from "@/lib/tools";
+import { TOOLLESS_MODELS } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -49,7 +50,7 @@ ${f.data.slice(0, 12_000)}
 }
 
 /** Konteks sistem: kepribadian + memori (opsional, dari profil user). */
-async function systemMessages(userId: string): Promise<ChatMsg[]> {
+async function systemMessages(userId: string, withTools: boolean): Promise<ChatMsg[]> {
   const rows = (await db()`
     SELECT username, personality, memory_enabled FROM users WHERE id = ${userId}
   `) as unknown as { username: string; personality: string | null; memory_enabled: boolean }[];
@@ -94,6 +95,22 @@ async function systemMessages(userId: string): Promise<ChatMsg[]> {
         role: "system",
         content: `Riwayat topik user ini (judul sesi terakhir): ${prior.map((p) => p.title).join(" · ")}.`,
       });
+    }
+  }
+  // tanpa tools: ganti seluruh blok aturan tool agar model tidak diperintah memanggil
+  // tool yang memang tidak dikirim (executor kimi-web/istaroth menolak field tools).
+  if (!withTools) {
+    const first = msgs[0];
+    const c0 = first?.content;
+    const i = typeof c0 === "string" ? c0.indexOf("ATURAN WAJIB:") : -1;
+    if (first && i >= 0) {
+      msgs[0] = {
+        ...first,
+        content:
+          (typeof c0 === "string" ? c0 : "").slice(0, i) +
+          "Model ini berjalan tanpa tool eksternal di antarmuka. Jawab dengan pengetahuanmu; " +
+          "bila butuh data terkini, sampaikan batasanmu sekali dengan jelas dan jangan mengaku punya tool.",
+      } as ChatMsg;
     }
   }
   return msgs;
@@ -238,7 +255,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const messages: ChatMsg[] = [...(await systemMessages(user.id)), ...turns];
+  const messages: ChatMsg[] = [...(await systemMessages(user.id, !TOOLLESS_MODELS.has(model))), ...turns];
 
   // 4. judul sesi: dijalankan BERSAMAAN dengan stream (model penalaran butuh ~10 dtk),
   //    jadi saat stream selesai judul sudah siap -> sidebar tidak pernah menampilkan 'New chat'.
@@ -250,7 +267,8 @@ export async function POST(req: Request) {
     : Promise.resolve("");
 
   // 5. streaming dari gateway
-  const tools = toolSchemas();
+  // executor tertentu (kimi-web/istaroth) menolak tools dengan 400 -> kirim tanpa tools
+  const tools = TOOLLESS_MODELS.has(model) ? [] : toolSchemas();
   const toolCtx = { userId: user.id };
   let gateway: Response;
   try {

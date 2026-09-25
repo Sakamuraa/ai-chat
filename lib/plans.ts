@@ -69,6 +69,12 @@ export function modelAllowed(plan: Plan, model: string): boolean {
 }
 
 /** Badge paket yang dibutuhkan tiap model (tampil di dropdown walau paket belum punya) */
+/** Model yang executor-nya MENOLAK OpenAI function tools (kimi-web dulu membalas 400
+ *  "Kimi Web does not support OpenAI function tools"). Kosong untuk sekarang:
+ *  target istaroth sudah diganti Manuel ke qoder/qfmodel dan terbukti MEMANGGIL tool
+ *  (uji 2026-09-26: tool_calls=true). Kalau target kembali ke kimi-web, isi lagi set ini. */
+export const TOOLLESS_MODELS = new Set<string>([]);
+
 export const MODEL_BADGE: Record<string, string> = {
   "onheil-1.1-luna": "",
   "onheil-1.5-selenia": "Pro",
