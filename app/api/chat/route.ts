@@ -33,10 +33,19 @@ const Body = z.object({
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Teks file disematkan inline supaya replay riwayat tetap utuh tanpa menyimpan biner. */
-function withTextAttachments(text: string, _files: z.infer<typeof Attachment>[]): string {
-  // Permintaan Manuel: dokumen TIDAK ditempel ke prompt — preview lampiran sudah ada di UI,
-  // dan isi berkas (mis. .json berisi token) tidak boleh ikut dikirim ke model.
-  return text;
+function withTextAttachments(text: string, files: z.infer<typeof Attachment>[]): string {
+  // Dokumen dipasang balik ke prompt (laporan Manuel, 2026-09-25: "file/documents jadi tak
+  // terbaca" — model harus bisa menjawab isi berkas). Preview UI tetap ada; isi dipotong 12k
+  // karakter per berkas supaya riwayat tak membengkak.
+  const docs = files.filter((f) => f.kind === "text");
+  if (docs.length === 0) return text;
+  const blocks = docs
+    .map((f) => `Lampiran "${f.name}" (${f.mime}):
+\`\`\`
+${f.data.slice(0, 12_000)}
+\`\`\``)
+    .join("\n\n");
+  return `${text}\n\n---\n\n${blocks}`;
 }
 
 /** Konteks sistem: kepribadian + memori (opsional, dari profil user). */
