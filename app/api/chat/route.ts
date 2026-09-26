@@ -262,7 +262,7 @@ export async function POST(req: Request) {
   const needsTitle = sessions[0].title === "New chat" && !isEdit;
   const titlePromise: Promise<string> = needsTitle
     ? generateTitle(
-        `Pertanyaan user:\n${String(userText).slice(0, 500)}`,
+        `Pertanyaan user:\n${String(userText).slice(0, 500)}${(attachments ?? []).length ? `\n[File: ${(attachments ?? []).map((a) => a.name).join(", ")}]` : ""}`,
       ).catch(() => "")
     : Promise.resolve("");
 
