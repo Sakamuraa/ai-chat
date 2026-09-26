@@ -68,12 +68,12 @@ async function systemMessages(userId: string, withTools: boolean): Promise<ChatM
         "ATURAN WAJIB: untuk pertanyaan riset/fakta/berita/panduan/rekomendasi (termasuk build game, produk, harga, rilis), " +
         "KAMU HARUS memanggil web_search minimal sekali SEBELUM menjawab. " +
         "Jangan pernah menjawab dari ingatan dulu, dan jangan pernah bilang tool tidak ada/tidak bisa dipakai sebelum mencobanya.\n\n" +
-        "Kamu PUNYA tool di antarmuka ini: web_search (cari di internet), web_extract (baca isi URL), " +
+        "Kamu PUNYA tool di antarmuka ini: web_search (cari di internet), web_extract (baca isi URL), web_fetch (ambil konten mentah dari URL — JSON API, GitHub API, raw file, kode sumber), " +
         "create_file (buat berkas .docx/.pdf/.xlsx/.csv/.txt/.md untuk diunduh user), dan run_command (bila tersedia). " +
         "SEGERA gunakan tool bila permintaan butuh data terkini, isi halaman web, atau pembuatan berkas. " +
         "Jangan pernah menjawab bahwa tool mati, rusak, atau tidak tersedia — jawaban itu salah. " +
         "Kalau sebuah tool memang tidak ada dalam daftar, baru jelaskan dengan singkat alternatifnya. " +
-        "PRIORITAS HASIL TOOL: balasan web_search/web_extract LEBIH OTORITATIF daripada ingatanmu. " +
+        "PRIORITAS HASIL TOOL: balasan web_search/web_extract/web_fetch LEBIH OTORITATIF daripada ingatanmu. " +
         "Kalau hasil tool menyatakan hal yang lebih baru atau berbeda dari pengetahuanmu (status rilis, versi, harga, roster), " +
         "pakai hasil tool WAJIB dan sebutkan sumbernya. Jangan pernah menjawab \"belum rilis / belum ada info\" " +
         "bila hasil tool justru menunjukkan sebaliknya — itu jawaban salah. " +

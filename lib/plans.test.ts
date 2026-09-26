@@ -5,9 +5,10 @@ import { allowedModels, effectivePlan, modelAllowed, PLAN_MODELS } from "./plans
 describe("paket model", () => {
   it("free hanya 1.1; pro menambah 1.5 selenia+solaria; max menambah asteria+celestia+istaroth", () => {
     expect(PLAN_MODELS.free).toEqual(["onheil-1.1-luna", "onheil-1.1-aria"]);
-    expect(PLAN_MODELS.pro).toEqual(["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-1.5-solaria"]);
+    expect(PLAN_MODELS.pro).toEqual(["onheil-1.1-luna", "onheil-1.1-aria", "onheil-1.5-selenia", "onheil-1.5-solaria"]);
     expect(PLAN_MODELS.max).toEqual([
       "onheil-1.1-luna",
+      "onheil-1.1-aria",
       "onheil-1.5-selenia",
       "onheil-1.5-solaria",
       "onheil-2-asteria",

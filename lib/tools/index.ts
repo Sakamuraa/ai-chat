@@ -63,6 +63,7 @@ export function toolLabel(name: string, argsJson: string): string {
   const args = parseArgs(argsJson) ?? {};
   if (name === "web_search") return `mencari: ${String(args.query ?? "").slice(0, 60)}`;
   if (name === "web_extract") return `membaca: ${String(args.url ?? "").slice(0, 60)}`;
+  if (name === "web_fetch") return `fetch: ${String(args.url ?? "").slice(0, 60)}`;
   if (name === "create_file") return `membuat: ${String(args.filename ?? "berkas")}`;
   if (name === "run_command") return `menjalankan: ${String(args.command ?? "").slice(0, 60)}`;
   return name;
