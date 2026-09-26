@@ -72,6 +72,7 @@ export default function ProfileModal({
     revoked: boolean;
     redeemed_at: string | null;
     redeemer: string | null;
+    expired?: boolean;
   }[]>([]);
 
   // hash #settings = buka/tutup modal (tanpa route baru)
@@ -168,6 +169,11 @@ export default function ProfileModal({
 
   async function revokeSubCode(code: string) {
     await fetch(`/api/subscriptions/codes/${encodeURIComponent(code)}`, { method: "DELETE" });
+    await loadCodes();
+  }
+
+  async function removeSubCode(code: string) {
+    await fetch(`/api/subscriptions/codes/${encodeURIComponent(code)}?remove=true`, { method: "DELETE" });
     await loadCodes();
   }
 
@@ -639,13 +645,15 @@ export default function ProfileModal({
               ) : (
                 codes.map((c) => {
                   const dur = DURATION_OPTIONS.find((d) => d.hours === c.duration_hours);
-                  const state = c.revoked ? "revoked" : c.redeemed_at ? "used" : "unused";
+                  const state = c.revoked ? "revoked" : c.expired ? "expired" : c.redeemed_at ? "used" : "unused";
                   const label =
                     state === "revoked"
                       ? t("sub.stRevoked")
-                      : state === "used"
-                        ? t("sub.stUsed")
-                        : t("sub.stUnused");
+                      : state === "expired"
+                        ? t("sub.stExpired")
+                        : state === "used"
+                          ? t("sub.stUsed")
+                          : t("sub.stUnused");
                   return (
                     <div
                       key={c.code}
@@ -662,7 +670,7 @@ export default function ProfileModal({
                         className={`shrink-0 ${
                           state === "unused"
                             ? "text-[#a16207] dark:text-[var(--accent)]"
-                            : state === "used"
+                            : state === "expired" || state === "used"
                               ? "text-[var(--muted)]"
                               : "text-[var(--danger)]"
                         }`}
@@ -670,13 +678,22 @@ export default function ProfileModal({
                         {label}
                         {c.redeemer ? ` · ${t("sub.usedBy", { name: c.redeemer })}` : ""}
                       </span>
-                      {state === "unused" ? (
+                      {state === "unused" || state === "used" ? (
                         <button
                           onClick={() => void revokeSubCode(c.code)}
                           className="shrink-0 text-[var(--faint)] transition hover:text-[var(--danger)]"
                           title={t("sub.revoke")}
                         >
                           {t("sub.revoke")}
+                        </button>
+                      ) : null}
+                      {state === "expired" || state === "revoked" ? (
+                        <button
+                          onClick={() => void removeSubCode(c.code)}
+                          className="shrink-0 text-[var(--faint)] transition hover:text-[var(--danger)]"
+                          title={t("sub.remove")}
+                        >
+                          {t("sub.remove")}
                         </button>
                       ) : null}
                     </div>

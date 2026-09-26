@@ -20,5 +20,8 @@ export type TokenOption = (typeof TOKEN_OPTIONS)[number];
 export type DurationOption = (typeof DURATION_OPTIONS)[number];
 
 export function formatTokens(n: number | null): string {
-  return n === null ? "Unlimited" : n.toLocaleString("id-ID");
+  if (n === null) return "\u221e";
+  if (n >= 1_000_000_000) return (n / 1e9) + "B";
+  if (n >= 1_000_000) return (n / 1e6) + "M";
+  return n.toLocaleString("id-ID");
 }

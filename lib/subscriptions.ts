@@ -25,6 +25,7 @@ export type CodeRow = {
   redeemed_at: string | null;
   redeemed_by: string | null;
   redeemer: string | null;
+  expired?: boolean;
 };
 
 /** Ambil status kuota user: pemakaian hari ini (UTC) + langganan aktif terbaru. */
@@ -81,7 +82,7 @@ export async function addUsage(userId: string, tokens: number): Promise<void> {
 
 function genCode(): string {
   // 64 bit acak (4+4 byte) — tebakan butuh 2^64 percobaan
-  return `ONHIL-${randomBytes(4).toString("hex").toUpperCase()}-${randomBytes(4).toString("hex").toUpperCase()}`;
+  return `TOF-${randomBytes(4).toString("hex").toUpperCase()}-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
 /** Buat satu kode langganan (hanya admin). token_limit null = unlimited. */
@@ -112,9 +113,11 @@ export async function listCodes(): Promise<CodeRow[]> {
     SELECT c.code, c.token_limit, c.duration_hours, c.plan::text AS plan,
            c.created_at::text AS created_at,
            c.revoked, c.redeemed_at::text AS redeemed_at, c.redeemed_by,
-           u.username AS redeemer
+           u.username AS redeemer,
+           (c.redeemed_by IS NOT NULL AND s.valid_until < now()) AS expired
     FROM sub_codes c
     LEFT JOIN users u ON u.id = c.redeemed_by
+    LEFT JOIN user_subs s ON s.source_code = c.code
     ORDER BY c.created_at DESC
     LIMIT 200
   `) as unknown as CodeRow[];
@@ -155,12 +158,28 @@ export async function redeem(code: string, userId: string): Promise<RedeemResult
   return { ok: false, error: "used" };
 }
 
-/** Cabut kode yang belum dipakai (admin). */
+/** Cabut kode (admin). Bisa cabut kode yang belum dipakai maupun sudah dipakai. */
 export async function revokeCode(code: string): Promise<boolean> {
   const rows = (await db()`
     UPDATE sub_codes SET revoked = true
-    WHERE code = ${code} AND redeemed_by IS NULL AND revoked = false
-    RETURNING code
+    WHERE code = ${code} AND revoked = false
+    RETURNING code, redeemed_by
+  `) as unknown as { code: string; redeemed_by: string | null }[];
+  if (rows.length === 0) return false;
+  // Kalau kode sudah dipakai, expire langganan aktif user
+  if (rows[0].redeemed_by) {
+    await db()`
+      UPDATE user_subs SET valid_until = now()
+      WHERE source_code = ${code} AND valid_until > now()
+    `;
+  }
+  return true;
+}
+
+/** Hapus kode dari database (admin). */
+export async function removeCode(code: string): Promise<boolean> {
+  const rows = (await db()`
+    DELETE FROM sub_codes WHERE code = ${code} RETURNING code
   `) as unknown as { code: string }[];
   return rows.length > 0;
 }

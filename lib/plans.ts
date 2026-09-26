@@ -16,6 +16,7 @@ export const PLANS: { id: Plan; label: string }[] = [
 
 export const MODEL_LABELS: Record<string, string> = {
   "onheil-1.1-luna": "Onheil 1.1 Luna",
+  "onheil-1.1-aria": "Onheil 1.1 Aria",
   "onheil-1.5-selenia": "Onheil 1.5 Selenia",
   "onheil-1.5-solaria": "Onheil 1.5 Solaria",
   "onheil-2-asteria": "Onheil 2 Asteria",
@@ -26,7 +27,7 @@ export const MODEL_LABELS: Record<string, string> = {
 const RANK: Record<Plan, number> = { free: 0, pro: 1, max: 2 };
 
 export const PLAN_MODELS: Record<Plan, string[]> = {
-  free: ["onheil-1.1-luna"],
+  free: ["onheil-1.1-luna", "onheil-1.1-aria"],
   pro: ["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-1.5-solaria"],
   max: [
     "onheil-1.1-luna",
@@ -77,6 +78,7 @@ export const TOOLLESS_MODELS = new Set<string>([]);
 
 export const MODEL_BADGE: Record<string, string> = {
   "onheil-1.1-luna": "",
+  "onheil-1.1-aria": "",
   "onheil-1.5-selenia": "Pro",
   "onheil-1.5-solaria": "Pro",
   "onheil-2-asteria": "Max",
