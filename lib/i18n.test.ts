@@ -56,8 +56,9 @@ describe("classifyFile", () => {
     expect(classifyFile("video.mp4", "video/mp4")).toBe("unsupported");
     expect(classifyFile("archive.zip", "application/zip")).toBe("unsupported");
     expect(classifyFile("docx.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe(
-      "unsupported",
+      "text",
     );
+    expect(classifyFile("buku.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("text");
   });
 
   it("daftar ekstensi teks tidak kosong dan huruf kecil", () => {

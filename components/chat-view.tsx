@@ -205,15 +205,27 @@ async function pickFiles(list: FileList | null) {
         setError(t("chat.attachTooBig", { mb: 5 }));
         continue;
       }
-      const { classifyFile } = await import("@/lib/attachments");
+      const { classifyFile, isDocFile, extractDocText, compressImage, upscaleTiny } =
+        await import("@/lib/attachments");
       const cls = classifyFile(file.name, file.type);
       if (cls === "unsupported") {
         setError(t("chat.attachUnsupported"));
         continue;
       }
+      let data: string;
+      if (cls === "image") {
+        data = await upscaleTiny(await compressImage(file));
+      } else if (isDocFile(file.name)) {
+        const txt = await extractDocText(file);
+        if (txt === null) {
+          setError(t("chat.attachUnsupported"));
+          continue;
+        }
+        data = txt;
+      } else {
+        data = await file.text();
+      }
       setError("");
-      const { compressImage, upscaleTiny } = await import("@/lib/attachments");
-      const data = cls === "image" ? await upscaleTiny(await compressImage(file)) : await file.text();
       setAttachments((prev) =>
         prev.length >= 6
           ? prev

@@ -12,6 +12,14 @@ export const TEXT_EXTS = [
 
 export type FileClass = "image" | "text" | "unsupported";
 
+/** Dokumen Office yang diekstrak teksnya di klien (ZIP tanpa dependensi). */
+export const DOC_EXTS = ["docx", "xlsx"];
+
+export function isDocFile(name: string): boolean {
+  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  return DOC_EXTS.includes(ext);
+}
+
 export function classifyFile(name: string, mime: string): FileClass {
   if (mime.startsWith("image/")) return "image";
   if (mime.startsWith("text/")) return "text";
@@ -21,6 +29,7 @@ export function classifyFile(name: string, mime: string): FileClass {
     return "text";
   }
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  if (DOC_EXTS.includes(ext)) return "text"; // teks diekstrak oleh extractDocText
   return TEXT_EXTS.includes(ext) ? "text" : "unsupported";
 }
 
@@ -127,5 +136,125 @@ export async function compressImage(file: File): Promise<string> {
     return dataUrl;
   } catch {
     return dataUrl;
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Ekstrak teks .docx / .xlsx di klien. Format keduanya ZIP: baca central
+// directory, inflate entry yang diinginkan dengan DecompressionStream
+// ("deflate-raw") — tanpa dependensi ekstra. Gagal -> null (ditolak UI).
+// ---------------------------------------------------------------------------
+async function zipInflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
+  const ds = new DecompressionStream("deflate-raw");
+  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+type ZipEntry = { name: string; method: number; compSize: number; local: number };
+
+function zipEntries(u8: Uint8Array, dv: DataView): ZipEntry[] {
+  const out: ZipEntry[] = [];
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 22 - 65535); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) return out;
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  for (let n = 0; n < count && off + 46 <= u8.length; n++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method = dv.getUint16(off + 10, true);
+    const compSize = dv.getUint32(off + 20, true);
+    const nameLen = dv.getUint16(off + 28, true);
+    const extraLen = dv.getUint16(off + 30, true);
+    const cmtLen = dv.getUint16(off + 32, true);
+    const local = dv.getUint32(off + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(off + 46, off + 46 + nameLen));
+    out.push({ name, method, compSize, local });
+    off += 46 + nameLen + extraLen + cmtLen;
+  }
+  return out;
+}
+
+async function zipReadEntry(u8: Uint8Array, dv: DataView, e: ZipEntry): Promise<string> {
+  const lNameLen = dv.getUint16(e.local + 26, true);
+  const lExtraLen = dv.getUint16(e.local + 28, true);
+  const start = e.local + 30 + lNameLen + lExtraLen;
+  const comp = u8.subarray(start, start + e.compSize);
+  const raw = e.method === 0 ? comp : await zipInflateRaw(comp);
+  return new TextDecoder().decode(raw);
+}
+
+function unescapeXml(s: string): string {
+  return s
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+}
+
+const DOC_CAP = 80_000; // batas karakter teks yang dikirim ke model
+
+export async function extractDocText(file: File): Promise<string | null> {
+  const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
+  if (!DOC_EXTS.includes(ext)) return null;
+  try {
+    const ab = await file.arrayBuffer();
+    const u8 = new Uint8Array(ab);
+    const dv = new DataView(ab);
+    const entries = zipEntries(u8, dv);
+    if (entries.length === 0) return null;
+
+    let text = "";
+    if (ext === "docx") {
+      const xmlEntry = entries.find((e) => e.name === "word/document.xml");
+      if (!xmlEntry) return null;
+      const xml = await zipReadEntry(u8, dv, xmlEntry);
+      text = xml
+        .replace(/<w:tab[^>]*\/>/g, "\t")
+        .replace(/<w:br[^>]*\/>/g, "\n")
+        .replace(/<\/w:p>/g, "\n")
+        .replace(/<[^>]+>/g, "");
+      text = unescapeXml(text);
+    } else {
+      // xlsx: sharedStrings + tiap sheet -> satu baris per <row>, sel dipisah " | "
+      const shared: string[] = [];
+      const ssEntry = entries.find((e) => e.name === "xl/sharedStrings.xml");
+      if (ssEntry) {
+        const ss = await zipReadEntry(u8, dv, ssEntry);
+        for (const si of ss.match(/<si>[\s\S]*?<\/si>/g) || []) {
+          const parts = (si.match(/<t[^>]*>[\s\S]*?<\/t>/g) || []).map((x) =>
+            unescapeXml(x.replace(/<[^>]+>/g, "")),
+          );
+          shared.push(parts.join(""));
+        }
+      }
+      const sheets = entries.filter((e) => /^xl\/worksheets\/sheet\d+\.xml$/.test(e.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const lines: string[] = [];
+      for (const sh of sheets) {
+        const xml = await zipReadEntry(u8, dv, sh);
+        for (const row of xml.match(/<row[\s\S]*?<\/row>/g) || []) {
+          const cells: string[] = [];
+          for (const c of row.match(/<c[\s\S]*?(?:<\/c>|\/>)/g) || []) {
+            let v = "";
+            if (/t="s"/.test(c)) {
+              const m = c.match(/<v>(\d+)<\/v>/);
+              v = m ? shared[Number(m[1])] || "" : "";
+            } else {
+              const m = c.match(/<t[^>]*>([\s\S]*?)<\/t>/) || c.match(/<v>([\s\S]*?)<\/v>/);
+              v = m ? unescapeXml(m[1]) : "";
+            }
+            if (v) cells.push(v);
+          }
+          if (cells.length) lines.push(cells.join(" | "));
+        }
+      }
+      text = lines.join("\n");
+    }
+    text = text.replace(/\n{3,}/g, "\n\n").trim();
+    if (!text) return null;
+    return text.length > DOC_CAP ? text.slice(0, DOC_CAP) + "\n…[dokumen dipotong]" : text;
+  } catch {
+    return null;
   }
 }

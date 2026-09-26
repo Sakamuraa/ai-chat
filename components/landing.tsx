@@ -83,15 +83,23 @@ export default function Landing({ username }: { username: string }) {
         continue;
       }
       setError("");
-      const data =
-        cls === "image"
-          ? await (async () => {
-              // kecilkan dulu (foto besar >1,5 jt karakter dilepas server -> model minta kirim ulang)
-              // lalu gambar kecil dinaikkan (upstream vision buta di bawah ~64px)
-              const { compressImage, upscaleTiny } = await import("@/lib/attachments");
-              return upscaleTiny(await compressImage(file));
-            })()
-          : await file.text();
+      const { isDocFile, extractDocText } = await import("@/lib/attachments");
+      let data: string;
+      if (cls === "image") {
+        // kecilkan dulu (foto besar >1,5 jt karakter dilepas server -> model minta kirim ulang)
+        // lalu gambar kecil dinaikkan (upstream vision buta di bawah ~64px)
+        const { compressImage, upscaleTiny } = await import("@/lib/attachments");
+        data = await upscaleTiny(await compressImage(file));
+      } else if (isDocFile(file.name)) {
+        const txt = await extractDocText(file);
+        if (txt === null) {
+          setError(t("chat.attachUnsupported"));
+          continue;
+        }
+        data = txt;
+      } else {
+        data = await file.text();
+      }
       setAttachments((prev) =>
         prev.length >= 6
           ? prev
