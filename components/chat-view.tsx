@@ -86,6 +86,9 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [attachments, setAttachments] = useState<UiAttachment[]>([]);
   const [attachMenu, setAttachMenu] = useState(false);
   const [hintIdx, setHintIdx] = useState(0);
+  // fase sebelum token pertama: 0 = baris ack "Saya cek dulu…", 1 = kartu thinking
+  const [ackPhase, setAckPhase] = useState(0);
+  const ackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
@@ -259,6 +262,9 @@ async function pickFiles(list: FileList | null) {
     setStreaming(true);
     setStreamText("");
     setToolSteps([]);
+    setAckPhase(0);
+    if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
+    ackTimerRef.current = setTimeout(() => setAckPhase(1), 2200);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
@@ -337,6 +343,10 @@ async function pickFiles(list: FileList | null) {
       if ((e as Error).name !== "AbortError") setError(t("chat.disconnected"));
       return "";
     } finally {
+      if (ackTimerRef.current) {
+        clearTimeout(ackTimerRef.current);
+        ackTimerRef.current = null;
+      }
       setStreamText("");
       setStreaming(false);
       abortRef.current = null;
@@ -662,7 +672,21 @@ async function pickFiles(list: FileList | null) {
               );
             })() : null}
 
-            {streaming && !streamText ? (
+            {streaming && !streamText && ackPhase === 0 ? (
+              <div className="mb-7 flex items-start gap-3.5">
+                <span className="mt-0.5 hidden shrink-0 sm:block">
+                  <BrandMark size={24} />
+                </span>
+                <div className="min-w-0 flex-1 pt-1">
+                  <p className="fade-up text-[15px] text-[var(--fg)]">
+                    {t("chat.ack")}
+                    <span className="caret" aria-hidden />
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {streaming && !streamText && ackPhase === 1 ? (
               <div className="mb-7 flex items-start gap-3.5">
                 <span className="mt-0.5 hidden shrink-0 sm:block">
                   <span className="block animate-pulse">
