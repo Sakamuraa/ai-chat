@@ -8,6 +8,7 @@ import { MODEL_BADGE, isPlan, allowedModels } from "@/lib/plans";
 
 export const MODELS = [
   { id: "onheil-1.1-luna", label: "Onheil 1.1 Luna" },
+  { id: "onheil-1.1-aria", label: "Onheil 1.1 Aria" },
   { id: "onheil-1.5-selenia", label: "Onheil 1.5 Selenia" },
   { id: "onheil-1.5-solaria", label: "Onheil 1.5 Solaria" },
   { id: "onheil-2-asteria", label: "Onheil 2 Asteria" },
