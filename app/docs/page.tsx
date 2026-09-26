@@ -21,6 +21,12 @@ const MODELS: ModelInfo[] = [
     cocok: "Tanya jawab cepat, menulis, meringkas, dan obrolan sehari-hari.",
   },
   {
+    id: "onheil-1.1-aria",
+    ringkas:
+      "Model serbaguna berbasis Gemini. Kombinasi kecepatan Luna dengan multimodal — bisa baca gambar dan dokumen.",
+    cocok: "Analisis foto, membaca dokumen, dan percakapan yang butuh konteks visual.",
+  },
+  {
     id: "onheil-1.5-selenia",
     ringkas:
       "Model seimbang untuk kerja yang butuh urutan panjang: menjawab lebih teliti dan lebih stabil untuk tugas berjenjang.",
