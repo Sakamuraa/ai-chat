@@ -28,9 +28,10 @@ const RANK: Record<Plan, number> = { free: 0, pro: 1, max: 2 };
 
 export const PLAN_MODELS: Record<Plan, string[]> = {
   free: ["onheil-1.1-luna", "onheil-1.1-aria"],
-  pro: ["onheil-1.1-luna", "onheil-1.5-selenia", "onheil-1.5-solaria"],
+  pro: ["onheil-1.1-luna", "onheil-1.1-aria", "onheil-1.5-selenia", "onheil-1.5-solaria"],
   max: [
     "onheil-1.1-luna",
+    "onheil-1.1-aria",
     "onheil-1.5-selenia",
     "onheil-1.5-solaria",
     "onheil-2-asteria",
