@@ -14,11 +14,17 @@ import { TOOLLESS_MODELS } from "@/lib/plans";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-/** Batas ronde tool per pesan — revisi Manuel 2026-09-27: running tool sampai tugas selesai
- *  (gaya Claude/ChatGPT). Batas lama 2 ronde membuat model berhenti di tengah pekerjaan;
- *  10 masih kurang utk proyek besar (scaffold Next.js = puluhan command) -> 20.
- *  Catatan: maxDuration=300 dtk tetap plafon atas seluruh percakapan. */
-const MAX_TOOL_ROUNDS = 20;
+/** Batas ronde tool WEB (web_search/web_extract/web_fetch) — permintaan Manuel 2026-09-27:
+ *  jalur web dibatasi biar data tak overload; 4 ronde ≈ maks ±16 sumber. */
+const MAX_WEB_ROUNDS = 4;
+
+/** Plafon darurat global — pengaman infinite loop & plafon teknis maxDuration=300 dtk.
+ *  Bukan batas produktif: jalur eksekusi (run_command/create_file/render_mermaid) jalan
+ *  TANPA hitungan ronde sampai tugas selesai (permintaan Manuel: "pokoknya run sampai selesai"). */
+const EMERGENCY_ROUNDS = 60;
+
+/** Tool eksekusi — dibebaskan dari hitungan ronde. */
+const EXEC_TOOL_NAMES = new Set(["run_command", "create_file", "render_mermaid"]);
 
 /** Dorongan lanjut saat model menutup dengan pembukaan niat tanpa tool_calls. */
 const CONTINUE_NUDGE =
@@ -324,6 +330,7 @@ export async function POST(req: Request) {
   let finish: string | null = null;
   const calls: { id: string; name: string; args: string }[] = [];
   let rounds = 0;
+  let webRounds = 0; // hitungan khusus ronde berisi tool web (batas overload data)
   let emptyRetries = 0; // jawaban kosong -> paksa ulang (maksimal 2x)
   const lastResults: string[] = []; // teks hasil tool -> disisipkan lagi sebelum putaran final
   let nudges = 0; // auto-continue: dorong model yang berhenti di pembukaan (maksimal 3x)
@@ -398,10 +405,15 @@ export async function POST(req: Request) {
           if (!done) continue;
 
           const valid = calls.filter((c) => Boolean(c && c.name));
-          if (finish === "tool_calls" && valid.length > 0 && rounds < MAX_TOOL_ROUNDS) {
-            // revisi Manuel 2026-09-27: running tool TERUS sampai tugas selesai (gaya Claude/ChatGPT),
-            // batas lama 2 ronde membuat model berhenti di tengah (mis. baru 1 pencarian lalu berhenti)
+          // ronde murni eksekusi = jalan terus; ronde berisi web = dihitung utk MAX_WEB_ROUNDS
+          const isExecRound = valid.length > 0 && valid.every((c) => EXEC_TOOL_NAMES.has(c.name));
+          const rondeBolehLanjut =
+           // revisi Manuel 2026-09-27: running tool TERUS sampai tugas selesai (gaya Claude/ChatGPT),
+           // batas lama 2 ronde membuat model berhenti di tengah (mis. baru 1 pencarian lalu berhenti)
+            rounds < EMERGENCY_ROUNDS && (isExecRound || webRounds < MAX_WEB_ROUNDS);
+          if (finish === "tool_calls" && valid.length > 0 && rondeBolehLanjut) {
             rounds++;
+            if (!isExecRound) webRounds++;
             allText += roundText;
             roundText = "";
             finish = null;
@@ -436,7 +448,9 @@ export async function POST(req: Request) {
             for (const res of results) if (res.ok && res.text) lastResults.push(res.text);
             flushUsage(); // putaran selesai -> akumulasi usage-nya
             // ronde terakhir: TANPA tools supaya model wajib menjawab
-            if (rounds >= MAX_TOOL_ROUNDS && lastResults.length > 0) {
+            const paksaFinal =
+              rounds >= EMERGENCY_ROUNDS || (!isExecRound && webRounds >= MAX_WEB_ROUNDS);
+            if (paksaFinal && lastResults.length > 0) {
               // D2: hasil tool diulang sebagai konteks eksplisit — model free-tier
               // sering menganggap role:tool kosong, padahal datanya sudah ada
               conv = [
@@ -449,7 +463,7 @@ export async function POST(req: Request) {
                 },
               ];
             }
-            gateway = rounds >= MAX_TOOL_ROUNDS
+            gateway = paksaFinal
               // ronde final: tools + tool_choice "none" — model diberi tahu struktural
               // bahwa tool dilarang, jadi ia menjawab dari ringkasan, bukan mengulang
               // tool-call sebagai teks DSML (bug istaroth 2026-09-26)
@@ -465,7 +479,7 @@ export async function POST(req: Request) {
           if (
             finish !== "tool_calls" &&
             rounds > 0 &&
-            rounds < MAX_TOOL_ROUNDS &&
+            rounds < EMERGENCY_ROUNDS &&
             nudges < 3 &&
             looksLikeIntent(roundText)
           ) {
