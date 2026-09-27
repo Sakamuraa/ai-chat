@@ -255,12 +255,30 @@ async function makeXlsx(title: string, sections: Section[]): Promise<Buffer> {
 const create: ToolDef = {
   name: "create_file",
   description:
-    "Buat berkas nyata untuk diunduh user: docx, pdf, xlsx, csv, txt, atau md. Isi disusun dari daftar bagian (judul bagian, paragraf, tabel). Hasil tool memuat URL unduhan ABSOLUT — salin persis apa adanya ke jawabanmu sebagai tautan Markdown, jangan mengganti atau menebak domain sendiri.",
+    "Buat berkas nyata untuk diunduh user: docx, pdf, xlsx, csv, txt, md, atau ZIP (arsip). " +
+    "Dokumen diisi lewat `sections` (judul bagian, paragraf, tabel); arsip .zip diisi lewat `files` " +
+    "(daftar {path, content, encoding?} — content teks UTF-8 biasa, atau base64 bila encoding=base64 utk biner). " +
+    "Hasil tool memuat URL unduhan ABSOLUT — salin persis apa adanya ke jawabanmu sebagai tautan Markdown, " +
+    "jangan mengganti atau menebak domain sendiri.",
   parameters: {
     type: "object",
     properties: {
-      filename: { type: "string", description: "Nama berkas tanpa folder, wajib berekstensi: docx/pdf/xlsx/csv/txt/md" },
+      filename: { type: "string", description: "Nama berkas tanpa folder, wajib berekstensi: docx/pdf/xlsx/csv/txt/md/zip" },
       title: { type: "string", description: "Judul dokumen" },
+      files: {
+        type: "array",
+        description: "Khusus .zip: daftar berkas yang masuk ke arsip",
+        maxItems: 400,
+        items: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Jalur di dalam arsip, mis. src/app/page.tsx" },
+            content: { type: "string", description: "Isi berkas (UTF-8) atau base64 bila encoding=base64" },
+            encoding: { type: "string", enum: ["utf8", "base64"] },
+          },
+          required: ["path", "content"],
+        },
+      },
       sections: {
         type: "array",
         maxItems: MAX_SECTION,
@@ -280,21 +298,38 @@ const create: ToolDef = {
         },
       },
     },
-    required: ["filename", "title", "sections"],
+    required: ["filename"],
   },
   enabled: () => Boolean(process.env.DATABASE_URL),
   execute: async (args, ctx): Promise<ToolResult> => {
     const filename = String(args.filename ?? "").trim().replace(/[\\/]/g, "_").slice(0, 120);
     const title = String(args.title ?? filename).trim().slice(0, 300) || filename;
     const ext = filename.includes(".") ? filename.split(".").pop()!.toLowerCase() : "";
-    const known = ["docx", "pdf", "xlsx", "csv", "txt", "md"];
+    const known = ["docx", "pdf", "xlsx", "csv", "txt", "md", "zip"];
     if (!known.includes(ext)) return { ok: false, error: `ekstensi tidak didukung: .${ext} (pakai ${known.join(", ")})` };
     const sections = sectionsOf(args);
-    if (sections.length === 0) return { ok: false, error: "sections kosong" };
+    if (sections.length === 0 && ext !== "zip") return { ok: false, error: "sections kosong" };
 
     let bytes: Buffer;
     try {
       if (ext === "docx") bytes = await makeDocx(title, sections);
+      else if (ext === "zip") {
+        // arsip dibangun di server (fflate) dari daftar berkas — tak butuh shell zip
+        const { zipSync, strToU8 } = await import("fflate");
+        const raw = Array.isArray(args.files) ? (args.files as unknown[]).slice(0, 400) : [];
+        const bundle: Record<string, Uint8Array> = {};
+        for (const item of raw) {
+          const f = (item ?? {}) as Record<string, unknown>;
+          const p = String(f.path ?? "").replace(/^\/+/, "").slice(0, 240);
+          if (!p || p.split("/").includes("..")) continue; // path traversal dibuang
+          const c = String(f.content ?? "");
+          bundle[p] =
+            f.encoding === "base64" ? Buffer.from(c, "base64") : strToU8(c.slice(0, 400_000));
+        }
+        if (Object.keys(bundle).length === 0)
+          return { ok: false, error: "zip butuh args.files = daftar {path, content} (encoding: base64 utk biner)" };
+        bytes = Buffer.from(zipSync(bundle));
+      }
       else if (ext === "pdf") bytes = await makePdf(title, sections);
       else if (ext === "xlsx") bytes = await makeXlsx(title, sections);
       else if (ext === "csv") {
@@ -323,6 +358,7 @@ const create: ToolDef = {
     if (bytes.length > 12_000_000) return { ok: false, error: "berkas terlalu besar (maksimal 12 MB)" };
 
     const MIME: Record<string, string> = {
+      zip: "application/zip",
       docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       pdf: "application/pdf",
       xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
