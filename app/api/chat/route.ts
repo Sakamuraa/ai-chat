@@ -416,7 +416,10 @@ export async function POST(req: Request) {
               ];
             }
             gateway = rounds >= 2
-              ? await streamChat(model, conv, abort.signal)
+              // ronde final: tools + tool_choice "none" — model diberi tahu struktural
+              // bahwa tool dilarang, jadi ia menjawab dari ringkasan, bukan mengulang
+              // tool-call sebagai teks DSML (bug istaroth 2026-09-26)
+              ? await streamChat(model, conv, abort.signal, tools, "none")
               : await streamChat(model, conv, abort.signal, tools);
             reader = gateway.body!.getReader();
             continue;
@@ -436,7 +439,7 @@ export async function POST(req: Request) {
               gateway = await streamChat(model, [
                 ...conv,
                 { role: "user", content: "Jawab sekarang, langsung ke inti tanpa tool." },
-              ], abort.signal);
+              ], abort.signal, tools, "none");
               reader = gateway.body!.getReader();
               const { value, done } = await reader.read();
               if (value) { feed(value); ctrl.enqueue(value); }

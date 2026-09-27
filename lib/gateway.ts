@@ -30,6 +30,11 @@ export async function streamChat(
   signal?: AbortSignal,
   /** daftar tool OpenAI-compatible; kosong = tanpa tool */
   tools?: unknown[],
+  /** "auto" (default) = model boleh memanggil tool.
+   *  "none" = tools tetap dikirim tapi pemanggilan DILARANG — dipakai ronde final:
+   *  tanpa tools di payload, deepseek-v4.1-flash mengulang tool-call sebagai teks
+   *  DSML (< | DSML | invoke ...>) yang bocor mentah ke bubble (bug istaroth, 2026-09-26). */
+  toolChoice: "auto" | "none" = "auto",
 ) {
   const res = await fetch(`${BASE()}/chat/completions`, {
     method: "POST",
@@ -38,7 +43,7 @@ export async function streamChat(
       model,
       messages,
       stream: true,
-      ...(tools && tools.length ? { tools, tool_choice: "auto" } : {}),
+      ...(tools && tools.length ? { tools, tool_choice: toolChoice } : {}),
     }),
     signal: signal ?? AbortSignal.timeout(300_000),
   });
