@@ -289,7 +289,14 @@ export async function POST(req: Request) {
   // 5. streaming dari gateway
   // executor tertentu (kimi-web/istaroth) menolak tools dengan 400 -> kirim tanpa tools
   const tools = TOOLLESS_MODELS.has(model) ? [] : toolSchemas();
-  const toolCtx = { userId: user.id };
+  const toolCtx = {
+    userId: user.id,
+    // origin absolut dari request — hasil create_file harus berisi URL lengkap,
+    // kalau cuma path relatif model menebak host sendiri (pernah menghasilkan domain mati)
+    origin: `${req.headers.get("x-forwarded-proto") ?? "https"}://${
+      req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "ai.onheil.fun"
+    }`,
+  };
   let gateway: Response;
   try {
     gateway = await streamChat(model, messages, abort.signal, tools);

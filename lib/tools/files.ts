@@ -255,7 +255,7 @@ async function makeXlsx(title: string, sections: Section[]): Promise<Buffer> {
 const create: ToolDef = {
   name: "create_file",
   description:
-    "Buat berkas nyata untuk diunduh user: docx, pdf, xlsx, csv, txt, atau md. Isi disusun dari daftar bagian (judul bagian, paragraf, tabel). Setelah selesai, URL unduhan akan muncul di jawabanmu — sisipkan sebagai tautan Markdown.",
+    "Buat berkas nyata untuk diunduh user: docx, pdf, xlsx, csv, txt, atau md. Isi disusun dari daftar bagian (judul bagian, paragraf, tabel). Hasil tool memuat URL unduhan ABSOLUT — salin persis apa adanya ke jawabanmu sebagai tautan Markdown, jangan mengganti atau menebak domain sendiri.",
   parameters: {
     type: "object",
     properties: {
@@ -339,12 +339,12 @@ const create: ToolDef = {
     const id = rows[0]?.id;
     if (!id) return { ok: false, error: "gagal menyimpan berkas" };
 
-    const url = `/api/files/${id}`;
+    const url = `${ctx.origin ?? ""}/api/files/${id}`;
     return {
       ok: true,
       fileUrl: url,
       fileName: filename,
-      text: `Berkas "${filename}" (${ext.toUpperCase()}, ${(bytes.length / 1024).toFixed(0)} KB) berhasil dibuat. Unduh: ${url}`,
+      text: `Berkas "${filename}" (${ext.toUpperCase()}, ${(bytes.length / 1024).toFixed(0)} KB) berhasil dibuat. URL unduhan (absolut, salin persis): ${url}`,
     };
   },
 };

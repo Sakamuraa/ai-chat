@@ -5,7 +5,8 @@ export type ToolResult =
   | { ok: true; text: string; fileUrl?: string; fileName?: string }
   | { ok: false; error: string };
 
-export type ToolCtx = { userId: string };
+/** origin situs (https://ai.onheil.fun) — dipakai tool untuk URL absolut, contoh create_file */
+export type ToolCtx = { userId: string; origin?: string };
 
 export type ToolDef = {
   name: string;
