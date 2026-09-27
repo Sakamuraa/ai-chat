@@ -98,6 +98,9 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [shareBusy, setShareBusy] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  // server mengirim {type:"resume"} saat mendekati batas 300 dtk Vercel ->
+  // loop di send() melanjutkan di request baru dari checkpoint (tanpa putus visual)
+  const resumeRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
@@ -257,11 +260,15 @@ async function pickFiles(list: FileList | null) {
     }
   }
 
-  async function callChat(payload: Record<string, unknown>): Promise<string> {
+  async function callChat(
+    payload: Record<string, unknown>,
+    opts: { keepPanel?: boolean } = {},
+  ): Promise<string> {
     setError("");
+    resumeRef.current = false;
     setStreaming(true);
     setStreamText("");
-    setToolSteps([]);
+    if (!opts.keepPanel) setToolSteps([]);
     setAckPhase(0);
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     ackTimerRef.current = setTimeout(() => setAckPhase(1), 2200);
@@ -327,7 +334,14 @@ async function pickFiles(list: FileList | null) {
           }
           evt = "";
           try {
-            const obj = JSON.parse(payload2) as { choices?: { delta?: { content?: string } }[] };
+            const obj = JSON.parse(payload2) as {
+              type?: string;
+              choices?: { delta?: { content?: string } }[];
+            };
+            if (obj.type === "resume") {
+              resumeRef.current = true;
+              continue;
+            }
             const piece = obj.choices?.[0]?.delta?.content;
             if (typeof piece === "string") {
               acc += piece;
@@ -340,7 +354,8 @@ async function pickFiles(list: FileList | null) {
       }
       return acc;
     } catch (e) {
-      if ((e as Error).name !== "AbortError") setError(t("chat.disconnected"));
+      if ((e as Error).name === "AbortError") resumeRef.current = false;
+      else setError(t("chat.disconnected"));
       return "";
     } finally {
       if (ackTimerRef.current) {
@@ -410,7 +425,7 @@ async function pickFiles(list: FileList | null) {
       setMessages(copy);
     }
 
-    const acc = await callChat({
+    let acc = await callChat({
       sessionId: sid,
       model: mdl,
       content,
@@ -418,6 +433,16 @@ async function pickFiles(list: FileList | null) {
       editMessageId: editedId,
       attachments: files.length > 0 ? files : undefined,
     });
+    // auto-resume lintas request: riwayat + hasil tool ada di checkpoint server,
+    // jadi tugas panjang terus berjalan melewati batas 300 dtk per request
+    for (let i = 0; i < 4 && resumeRef.current; i++) {
+      resumeRef.current = false;
+      const part = await callChat(
+        { sessionId: sid, model: mdl, content: "", resume: true },
+        { keepPanel: true },
+      );
+      acc = acc ? (part ? `${acc}\n\n${part}` : acc) : part;
+    }
     if (acc) setMessages((prev) => [...prev, { role: "assistant", content: acc }]);
 
     if (id === "new") {

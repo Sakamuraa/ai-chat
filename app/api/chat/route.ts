@@ -54,12 +54,30 @@ const Attachment = z.object({
 const Body = z.object({
   sessionId: z.string().uuid(),
   model: z.string().min(1).max(120),
-  content: z.string().min(1).max(32_000),
+  content: z.string().max(32_000),
   regenerate: z.boolean().optional(),
   /** Edit prompt user: potong riwayat dari pesan ini lalu generate ulang (efek sama seperti Ulangi) */
   editMessageId: z.string().uuid().optional(),
   attachments: z.array(Attachment).max(6).optional(),
+  /** Auto-resume lintas request: melanjutkan dari checkpoint saat mendekati batas 300 dtk Vercel */
+  resume: z.boolean().optional(),
 });
+
+/** Checkpoint ronde tool panjang — disimpan saat batas waktu mendekati, dimuat oleh request resume. */
+async function saveCheckpoint(sessionId: string, conv: ChatMsg[]) {
+  await db()`
+    CREATE TABLE IF NOT EXISTS chat_checkpoints (
+      session_id uuid PRIMARY KEY,
+      payload jsonb NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await db()`
+    INSERT INTO chat_checkpoints (session_id, payload)
+    VALUES (${sessionId}, ${JSON.stringify(conv)}::jsonb)
+    ON CONFLICT (session_id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()
+  `;
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -162,9 +180,12 @@ export async function POST(req: Request) {
         : "Data tidak valid.";
     return NextResponse.json({ error: "invalid_body", detail }, { status: 400 });
   }
-  const { sessionId, model, regenerate, editMessageId, attachments } = parsed.data;
+  const { sessionId, model, regenerate, editMessageId, attachments, resume } = parsed.data;
   let { content } = parsed.data;
   const isEdit = Boolean(editMessageId) || Boolean(regenerate);
+  if (!resume && !content.trim()) {
+    return NextResponse.json({ error: "invalid_body", detail: "Data tidak valid." }, { status: 400 });
+  }
 
   // kuota per akun (15 chat / 10 mnt) dan per IP (30 / 10 mnt) — pembatas terakhir
   // setelah gerbang same-origin, supaya kunci gateway tak bisa dikuras skrip.
@@ -189,6 +210,10 @@ export async function POST(req: Request) {
 
   const abort = new AbortController();
   req.signal.addEventListener("abort", () => abort.abort(), { once: true });
+  // plafon teknis Vercel = 300 dtk per fungsi; checkpoint dini sebelum batas itu supaya
+  // tugas panjang tak mati di tengah (klien auto-resume dari checkpoint — bug "otomatis mati" 2026-09-27)
+  const T0 = Date.now();
+  const CHECKPOINT_MS = 220_000;
 
   // 1. sesi harus milik user — selain itu 404
   const sessions = (await db()`
@@ -204,7 +229,9 @@ export async function POST(req: Request) {
   // 2. simpan pesan user
   //    - regenerate: buang jawaban terakhir, prompt tetap
   //    - edit: potong riwayat dari pesan yang diedit, ganti isinya, generate ulang
-  if (editMessageId) {
+  if (resume) {
+    // lanjut dari checkpoint — pesan user & judul sudah tercatat pada request pertama
+  } else if (editMessageId) {
     const target = (await db()`
       SELECT id, created_at, role FROM messages WHERE id = ${editMessageId} AND session_id = ${sessionId}
     `) as unknown as { id: string; created_at: string; role: string }[];
@@ -289,7 +316,7 @@ export async function POST(req: Request) {
 
   // 4. judul sesi: dijalankan BERSAMAAN dengan stream (model penalaran butuh ~10 dtk),
   //    jadi saat stream selesai judul sudah siap -> sidebar tidak pernah menampilkan 'New chat'.
-  const needsTitle = sessions[0].title === "New chat" && !isEdit;
+  const needsTitle = sessions[0].title === "New chat" && !isEdit && !resume;
   const titlePromise: Promise<string> = needsTitle
     ? generateTitle(
         `Pertanyaan user:\n${String(userText).slice(0, 500)}${(attachments ?? []).length ? `\n[File: ${(attachments ?? []).map((a) => a.name).join(", ")}]` : ""}`,
@@ -307,9 +334,22 @@ export async function POST(req: Request) {
       req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "ai.onheil.fun"
     }`,
   };
+  // muat checkpoint bila ini request lanjutan
+  let startConv: ChatMsg[] | null = null;
+  if (resume) {
+    const rows = (await db()`
+      SELECT payload FROM chat_checkpoints WHERE session_id = ${sessionId}
+    `) as unknown as { payload: unknown }[];
+    const ck = Array.isArray(rows[0]?.payload) ? (rows[0].payload as ChatMsg[]) : null;
+    if (!ck || ck.length === 0) {
+      return NextResponse.json({ error: "checkpoint_expired" }, { status: 409 });
+    }
+    startConv = ck;
+  }
+
   let gateway: Response;
   try {
-    gateway = await streamChat(model, messages, abort.signal, tools);
+    gateway = await streamChat(model, startConv ?? messages, abort.signal, tools);
   } catch (e) {
     const status = (e as { status?: number }).status ?? 502;
     return NextResponse.json(
@@ -319,7 +359,7 @@ export async function POST(req: Request) {
   }
 
   // putaran tool: kalau model meminta tool, jalankan dulu lalu stream lagi (maksimal 2 ronde (4 pencarian))
-  let conv: ChatMsg[] = messages;
+  let conv: ChatMsg[] = startConv ?? messages;
 
   let reader = gateway.body!.getReader();
   const dec = new TextDecoder();
@@ -403,6 +443,16 @@ export async function POST(req: Request) {
             ctrl.enqueue(value);
           }
           if (!done) continue;
+
+          // lewat 220 dtk (ronde tool panjang) -> checkpoint + minta klien resume di request baru,
+          // supaya tak dipatok paksa Vercel di 300 dtk (mati tanpa jawaban = bug "otomatis mati")
+          if (rounds > 0 && finish === "tool_calls" && Date.now() - T0 > CHECKPOINT_MS) {
+            await saveCheckpoint(sessionId, conv);
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: "resume" })}\n\n`));
+            ctrl.enqueue(enc.encode("data: [DONE]\n\n"));
+            ctrl.close();
+            return;
+          }
 
           const valid = calls.filter((c) => Boolean(c && c.name));
           // ronde murni eksekusi = jalan terus; ronde berisi web = dihitung utk MAX_WEB_ROUNDS
@@ -535,6 +585,8 @@ export async function POST(req: Request) {
                 INSERT INTO messages (session_id, role, content, model) VALUES (${sessionId}, 'assistant', ${assistantText}, ${model})
               `;
               await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
+              // jawaban final tercapai -> checkpoint tak diperlukan lagi
+              await db()`DELETE FROM chat_checkpoints WHERE session_id = ${sessionId}`;
             }
             flushUsage();
             // angka sesungguhnya dari gateway (prompt+riwayat+reasoning) bila tersedia;
