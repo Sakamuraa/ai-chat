@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowsClockwise,
   ArrowUp,
+  CaretRight,
+  Check,
+  CircleNotch,
   Copy,
   Image as ImageIcon,
   Paperclip,
@@ -65,10 +68,9 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
-  // langkah tool (mencari / membaca / membuat berkas) selama stream berjalan
-  const [toolSteps, setToolSteps] = useState<{ label: string; status: string }[]>([]);
-  // satu baris (gaya Gemini/Kimi): teks langkahnya yang berganti dengan animasi
-  const [stepIdx, setStepIdx] = useState(0);
+  // langkah tool realtime (gaya Claude.ai): ringkasan hitungan + daftar langkah terbuka
+  const [toolSteps, setToolSteps] = useState<{ name?: string; label: string; status: string }[]>([]);
+  const [stepsOpen, setStepsOpen] = useState(true);
   const [error, setError] = useState("");
   const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
   // model terakhir dipilih disimpan di localStorage supaya halaman sesi tak kembali ke model awal
@@ -165,20 +167,6 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
     return () => clearInterval(iv);
   }, [streaming, streamText]);
 
-  // langkah tool: ganti teks tiap 1,3 detik selama stream, berhenti di langkah terakhir
-  useEffect(() => {
-    if (toolSteps.length === 0) {
-      setStepIdx(0);
-      return;
-    }
-    if (!streaming) {
-      setStepIdx(toolSteps.length - 1);
-      return;
-    }
-    setStepIdx((i) => Math.min(i, toolSteps.length - 1));
-    const iv = setInterval(() => setStepIdx((i) => (i + 1) % toolSteps.length), 1300);
-    return () => clearInterval(iv);
-  }, [toolSteps.length, streaming]);
 
   // draft dari halaman awal (chat pertama) — dilewati di mode hanya-baca
   useEffect(() => {
@@ -322,7 +310,7 @@ async function pickFiles(list: FileList | null) {
           if (evt === "tool") {
             evt = "";
             try {
-              const step = JSON.parse(payload2) as { label: string; status: string };
+              const step = JSON.parse(payload2) as { name?: string; label: string; status: string };
               setToolSteps((prev) => {
                 const idx = prev.map((x) => x.label).lastIndexOf(step.label);
                 if (idx >= 0) {
@@ -667,19 +655,65 @@ async function pickFiles(list: FileList | null) {
             ))}
 
             {toolSteps.length > 0 ? (() => {
-              const st = toolSteps[Math.min(stepIdx, toolSteps.length - 1)];
-              const dot =
-                st.status === "gagal"
-                  ? "text-[var(--danger)]"
-                  : st.status === "selesai"
-                    ? "text-[var(--accent)]"
-                    : "animate-pulse text-[var(--accent)]";
+              // hitungan gaya Claude.ai: "Menjalankan 4 perintah, membaca 2 berkas, …"
+              const c = { run: 0, read: 0, search: 0, make: 0, other: 0 };
+              for (const s of toolSteps) {
+                if (s.label.startsWith("menjalankan")) c.run++;
+                else if (s.label.startsWith("membaca") || s.label.startsWith("fetch")) c.read++;
+                else if (s.label.startsWith("mencari")) c.search++;
+                else if (s.label.startsWith("membuat")) c.make++;
+                else c.other++;
+              }
+              const parts: string[] = [];
+              if (c.run) parts.push(t("chat.sum.run", { n: c.run }));
+              if (c.read) parts.push(t("chat.sum.read", { n: c.read }));
+              if (c.search) parts.push(t("chat.sum.search", { n: c.search }));
+              if (c.make) parts.push(t("chat.sum.make", { n: c.make }));
+              if (c.other) parts.push(t("chat.sum.other", { n: c.other }));
               return (
-                <div key={stepIdx} className="fade-up mb-5 flex items-center gap-2">
-                  <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-[11px] text-[var(--muted)]">
-                    <span aria-hidden className={dot}>●</span>
-                    <span className="truncate">{shortStepLabel(st.label)}</span>
-                  </span>
+                <div className="mb-5 max-w-full rounded-xl border border-[var(--border)] bg-[var(--sidebar)] px-3 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setStepsOpen((v) => !v)}
+                    className="flex w-full items-center gap-2 text-left text-xs text-[var(--muted)] transition hover:text-[var(--fg)]"
+                  >
+                    <CaretRight
+                      size={12}
+                      className={`shrink-0 transition-transform ${stepsOpen ? "rotate-90" : ""}`}
+                    />
+                    <span
+                      aria-hidden
+                      className={streaming ? "animate-pulse text-[var(--accent)]" : "text-[var(--accent)]"}
+                    >
+                      ●
+                    </span>
+                    <span className="truncate">{parts.join(", ")}</span>
+                    <span className="ml-auto shrink-0 text-[10px] tabular-nums text-[var(--faint)]">
+                      {toolSteps.length}
+                    </span>
+                  </button>
+                  {stepsOpen ? (
+                    <ul className="mt-2 space-y-1.5 border-t border-[var(--border)] pt-2">
+                      {toolSteps.map((st, i) => (
+                        <li key={`${st.label}-${i}`} className="flex items-center gap-2 text-[11px]">
+                          {st.status === "gagal" ? (
+                            <X size={12} weight="bold" className="shrink-0 text-[var(--danger)]" />
+                          ) : st.status === "selesai" ? (
+                            <Check size={12} weight="bold" className="shrink-0 text-[var(--accent)]" />
+                          ) : (
+                            <CircleNotch size={12} className="shrink-0 animate-spin text-[var(--accent)]" />
+                          )}
+                          <span
+                            className={`truncate ${
+                              st.status === "gagal" ? "text-[var(--danger)]" : "text-[var(--muted)]"
+                            }`}
+                          >
+                            {shortStepLabel(st.label)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               );
             })() : null}

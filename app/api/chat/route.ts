@@ -14,6 +14,26 @@ import { TOOLLESS_MODELS } from "@/lib/plans";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+/** Batas ronde tool per pesan — revisi Manuel 2026-09-27: running tool sampai tugas selesai
+ *  (gaya Claude/ChatGPT). Batas lama 2 ronde membuat model berhenti di tengah pekerjaan. */
+const MAX_TOOL_ROUNDS = 10;
+
+/** Dorongan lanjut saat model menutup dengan pembukaan niat tanpa tool_calls. */
+const CONTINUE_NUDGE =
+  "Lanjutkan eksekusinya sekarang — panggil tool yang kamu butuhkan sampai tugasnya benar-benar selesai, " +
+  "baru rangkum hasilnya. Jangan berhenti di rencana.";
+
+/** True kalau teks model adalah pembukaan niat ("hamba ambilkan…"), bukan jawaban final. */
+function looksLikeIntent(text: string): boolean {
+  if (!text || text.length > 500) return false; // jawaban final pendek jangan tersandung
+  const t = text.toLowerCase();
+  return (
+    /(saya|aku|hamba) akan|hamba (akan|ambil)|akan (saya|ku)?\s*(ambil|cari|periksa|unduh|jalankan|buat|baca)|pertama-tama|let me|i'?ll (get|fetch|check|search|pull|read|grab)|first,? i/.test(
+      t,
+    )
+  );
+}
+
 const Attachment = z.object({
   name: z.string().min(1).max(120),
   kind: z.enum(["image", "text"]),
@@ -295,6 +315,7 @@ export async function POST(req: Request) {
   let rounds = 0;
   let emptyRetries = 0; // jawaban kosong -> paksa ulang (maksimal 2x)
   const lastResults: string[] = []; // teks hasil tool -> disisipkan lagi sebelum putaran final
+  let nudges = 0; // auto-continue: dorong model yang berhenti di pembukaan (maksimal 3x)
   // pemakaian token sesungguhnya dari gateway (bukan perkiraan teks)
   let usageTotal = 0; // akumulasi antar-putaran (ronde tool = request terpisah)
   let usageStream = 0; // tertinggi pada satu stream (event usage boleh berulang)
@@ -366,7 +387,9 @@ export async function POST(req: Request) {
           if (!done) continue;
 
           const valid = calls.filter((c) => Boolean(c && c.name));
-          if (finish === "tool_calls" && valid.length > 0 && rounds < 2) { // maks 2 ronde = 4 pencarian (permintaan Manuel: 8 terlalu lama & bikin jawaban jelek)
+          if (finish === "tool_calls" && valid.length > 0 && rounds < MAX_TOOL_ROUNDS) {
+            // revisi Manuel 2026-09-27: running tool TERUS sampai tugas selesai (gaya Claude/ChatGPT),
+            // batas lama 2 ronde membuat model berhenti di tengah (mis. baru 1 pencarian lalu berhenti)
             rounds++;
             allText += roundText;
             roundText = "";
@@ -402,7 +425,7 @@ export async function POST(req: Request) {
             for (const res of results) if (res.ok && res.text) lastResults.push(res.text);
             flushUsage(); // putaran selesai -> akumulasi usage-nya
             // ronde terakhir: TANPA tools supaya model wajib menjawab
-            if (rounds >= 2 && lastResults.length > 0) {
+            if (rounds >= MAX_TOOL_ROUNDS && lastResults.length > 0) {
               // D2: hasil tool diulang sebagai konteks eksplisit — model free-tier
               // sering menganggap role:tool kosong, padahal datanya sudah ada
               conv = [
@@ -415,12 +438,39 @@ export async function POST(req: Request) {
                 },
               ];
             }
-            gateway = rounds >= 2
+            gateway = rounds >= MAX_TOOL_ROUNDS
               // ronde final: tools + tool_choice "none" — model diberi tahu struktural
               // bahwa tool dilarang, jadi ia menjawab dari ringkasan, bukan mengulang
               // tool-call sebagai teks DSML (bug istaroth 2026-09-26)
               ? await streamChat(model, conv, abort.signal, tools, "none")
               : await streamChat(model, conv, abort.signal, tools);
+            reader = gateway.body!.getReader();
+            continue;
+          }
+
+          // auto-continue: model menutup dengan pembukaan niat ("hamba ambilkan…") TANPA tool_calls
+          // padahal ada hasil tool -> dorong lanjut sampai tugas selesai (permintaan Manuel,
+          // 2026-09-27: jangan berhenti di tengah, macam Claude/ChatGPT yang jalan terus)
+          if (
+            finish !== "tool_calls" &&
+            rounds > 0 &&
+            rounds < MAX_TOOL_ROUNDS &&
+            nudges < 3 &&
+            looksLikeIntent(roundText)
+          ) {
+            nudges++;
+            allText += roundText;
+            roundText = "";
+            finish = null;
+            lineBuf = "";
+            calls.length = 0;
+            flushUsage();
+            gateway = await streamChat(
+              model,
+              [...conv, { role: "user" as const, content: CONTINUE_NUDGE }],
+              abort.signal,
+              tools,
+            );
             reader = gateway.body!.getReader();
             continue;
           }
