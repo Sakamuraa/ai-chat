@@ -28,7 +28,9 @@ const render: ToolDef = {
   description:
     "Render diagram Mermaid (flowchart, sequence, class, ER, state, use case/UML, pie, gantt, mindmap) menjadi GAMBAR nyata. " +
     "Setelah sukses, TAMPILKAN di jawaban sebagai Markdown: ![judul diagram](URL) memakai URL absolut persis dari hasil tool. " +
-    "Pakai ini setiap kali user minta diagram/flowchart/visualisasi — jangan mengirim kode mentah sebagai teks.",
+    "Pakai ini setiap kali user minta diagram/flowchart/visualisasi — jangan mengirim kode mentah sebagai teks. " +
+    "Label harus NATURAL: nama elemen apa adanya tanpa awalan kode (UC-01, A-2) dan tanpa notasi <<include>>/<<extend>> di teks; " +
+    "relasi ditulis sebagai kalimat Indonesia yang jelas (mis. 'wajib memilih kategori'). Nomor/index hanya bila user memintanya.",
   parameters: {
     type: "object",
     properties: {
