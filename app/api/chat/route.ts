@@ -15,20 +15,24 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /** Batas ronde tool per pesan — revisi Manuel 2026-09-27: running tool sampai tugas selesai
- *  (gaya Claude/ChatGPT). Batas lama 2 ronde membuat model berhenti di tengah pekerjaan. */
-const MAX_TOOL_ROUNDS = 10;
+ *  (gaya Claude/ChatGPT). Batas lama 2 ronde membuat model berhenti di tengah pekerjaan;
+ *  10 masih kurang utk proyek besar (scaffold Next.js = puluhan command) -> 20.
+ *  Catatan: maxDuration=300 dtk tetap plafon atas seluruh percakapan. */
+const MAX_TOOL_ROUNDS = 20;
 
 /** Dorongan lanjut saat model menutup dengan pembukaan niat tanpa tool_calls. */
 const CONTINUE_NUDGE =
   "Lanjutkan eksekusinya sekarang — panggil tool yang kamu butuhkan sampai tugasnya benar-benar selesai, " +
   "baru rangkum hasilnya. Jangan berhenti di rencana.";
 
-/** True kalau teks model adalah pembukaan niat ("hamba ambilkan…"), bukan jawaban final. */
+/** True kalau teks model adalah pembukaan niat ("hamba ambilkan…", "hamba lanjutkan…"),
+ *  bukan jawaban final. Revisi 2026-09-27: bug "stop di tengah" terjadi karena pembuka
+ *  "Hamba lanjutkan…" lolos detector -> pola lanjut/buat/tulis ikut masuk. */
 function looksLikeIntent(text: string): boolean {
   if (!text || text.length > 500) return false; // jawaban final pendek jangan tersandung
   const t = text.toLowerCase();
   return (
-    /(saya|aku|hamba) akan|hamba (akan|ambil)|akan (saya|ku)?\s*(ambil|cari|periksa|unduh|jalankan|buat|baca)|pertama-tama|let me|i'?ll (get|fetch|check|search|pull|read|grab)|first,? i/.test(
+    /(saya|aku|hamba) (akan|lanjut)|hamba (akan|ambil|lanjut|buat|segera|mulai)|lanjutkan|melanjutkan|akan (saya|ku)?\s*(ambil|cari|periksa|unduh|jalankan|buat|baca|lanjut|tulis|selesai)|lanjut\s*(membuat|mengisi|menulis|mengambil)|pertama-tama|sekarang hamba|let me|i'?ll (get|fetch|check|search|pull|read|grab|build|create|write)|first,? i/.test(
       t,
     )
   );
