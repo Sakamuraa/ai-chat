@@ -75,6 +75,23 @@ export default function ProfileModal({
     expired?: boolean;
   }[]>([]);
 
+  // Persen limit TERSISA — berkurang saat token dipakai (dari /api/usage).
+  // Sub aktif: sisa token sub / total token sub. Tanpa sub: sisa harian / limit harian.
+  const subPct = quota?.sub
+    ? quota.sub.tokenLimit && quota.sub.remaining !== null
+      ? Math.max(0, Math.min(100, Math.round((quota.sub.remaining / quota.sub.tokenLimit) * 100)))
+      : 100 // tokenLimit null = unlimited
+    : null;
+  const limitPct =
+    subPct ??
+    (quota
+      ? quota.unlimited
+        ? 100
+        : quota.remaining !== null && quota.dailyLimit > 0
+          ? Math.max(0, Math.min(100, Math.round((quota.remaining / quota.dailyLimit) * 100)))
+          : PLAN_LIMIT_PERCENT
+      : PLAN_LIMIT_PERCENT);
+
   // hash #settings = buka/tutup modal (tanpa route baru)
   useEffect(() => {
     const sync = () => setOpen(window.location.hash === "#settings");
@@ -495,8 +512,21 @@ export default function ProfileModal({
         <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-4">
           <p className="text-sm font-medium">{t("sub.section")}</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {t("sub.limit", { n: PLAN_LIMIT_PERCENT })}
+            {t("sub.limit", { n: limitPct })}
           </p>
+          <div
+            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--panel)]"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={limitPct}
+            data-testid="plan-limit-bar"
+          >
+            <div
+              className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-500"
+              style={{ width: `${limitPct}%` }}
+            />
+          </div>
           <p className="mt-1 flex items-center gap-2 text-xs text-[var(--muted)]">
             <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--fg)]">
               {t("sub.plan")}: {plan === "pro" ? t("sub.planPro") : plan === "max" ? t("sub.planMax") : t("sub.planFree")}
@@ -507,7 +537,7 @@ export default function ProfileModal({
             <div className="mt-3 space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm">
               <p className="font-medium text-[var(--fg)]">{t("sub.active")}</p>
               <p className="text-xs text-[var(--muted)]">
-                {t("sub.limit", { n: PLAN_LIMIT_PERCENT })}
+                {t("sub.limit", { n: subPct ?? PLAN_LIMIT_PERCENT })}
               </p>
               <p className="text-xs text-[var(--muted)]">
                 {t("sub.validUntil")}: {new Date(quota.sub.validUntil).toLocaleString("id-ID")}
