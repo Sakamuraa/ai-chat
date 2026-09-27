@@ -40,7 +40,9 @@ describe.skipIf(!hasDb)("create_file .zip (smoke dgn DB nyata)", () => {
       { userId, origin: "https://ai.onheil.fun" },
     );
     expect(res.ok).toBe(true);
-    const m = /\/api\/files\/([0-9a-f-]{36})/.exec(res.fileUrl ?? "");
+    // expect() tak narrow union di tsc -> angkat manual ke varian { ok: true }
+    const okRes = res as Extract<import("./types").ToolResult, { ok: true }>;
+    const m = /\/api\/files\/([0-9a-f-]{36})/.exec(okRes.fileUrl ?? "");
     expect(m).toBeTruthy();
     const fileId = m![1];
 
