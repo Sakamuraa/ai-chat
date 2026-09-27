@@ -3,10 +3,11 @@ import type { ToolCtx, ToolDef, ToolResult } from "./types";
 import { WEB_TOOLS } from "./web";
 import { FILE_TOOLS } from "./files";
 import { EXEC_TOOLS } from "./exec";
+import { DIAGRAM_TOOLS } from "./diagram";
 
 export type { ToolResult } from "./types";
 
-const ALL: ToolDef[] = [...WEB_TOOLS, ...FILE_TOOLS, ...EXEC_TOOLS];
+const ALL: ToolDef[] = [...WEB_TOOLS, ...FILE_TOOLS, ...DIAGRAM_TOOLS, ...EXEC_TOOLS];
 
 /** Daftar tool yang siap dipakai pada runtime ini (dependensi env terpenuhi). */
 export function activeTools(): ToolDef[] {
@@ -65,6 +66,7 @@ export function toolLabel(name: string, argsJson: string): string {
   if (name === "web_extract") return `membaca: ${String(args.url ?? "").slice(0, 60)}`;
   if (name === "web_fetch") return `fetch: ${String(args.url ?? "").slice(0, 60)}`;
   if (name === "create_file") return `membuat: ${String(args.filename ?? "berkas")}`;
+  if (name === "render_mermaid") return `membuat diagram: ${String(args.title ?? "mermaid").slice(0, 50)}`;
   if (name === "run_command") return `menjalankan: ${String(args.command ?? "").slice(0, 60)}`;
   return name;
 }
