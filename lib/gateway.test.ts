@@ -59,6 +59,10 @@ describe("titleLooksLikeAnswer", () => {
     expect(titleLooksLikeAnswer("I cannot see any image in this conversation.")).toBe(true);
     // bug nyata: output panjang yang dipotong sanitizeTitle jadi "Saya Tidak Melihat Gamb..."
     expect(titleLooksLikeAnswer("Saya Tidak Melihat Gambar Yang Kamu Maksud")).toBe(true);
+    // bug luna: pembuka gaya jawaban ("Tuanku, hamba telah memeriksa tangkapan layar ini")
+    expect(titleLooksLikeAnswer("Tuanku Hamba Telah Memeriksa Tangkapan")).toBe(true);
+    expect(titleLooksLikeAnswer("Baiklah, berikut penjelasan gambar yang kamu minta")).toBe(true);
+    expect(titleLooksLikeAnswer("Tentu, saya akan jelaskan")).toBe(true);
   });
 
   it("menerima label topik pendek yang valid", () => {
@@ -66,5 +70,9 @@ describe("titleLooksLikeAnswer", () => {
     expect(titleLooksLikeAnswer("Halaman Anime Onheilnime")).toBe(false);
     expect(titleLooksLikeAnswer("Diskusi Closure JavaScript")).toBe(false);
     expect(titleLooksLikeAnswer("Dokumen Docx Gagal")).toBe(false);
+    // kata biasa jangan tersandung substring ('tentang' mengandung 'tentu')
+    expect(titleLooksLikeAnswer("Tentang Anime Musim Gugur")).toBe(false);
+    // tapi kata pembuka utuh tetap ditangkap
+    expect(titleLooksLikeAnswer("Oke Siap Kita Lanjut Topik")).toBe(true);
   });
 });

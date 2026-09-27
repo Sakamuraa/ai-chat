@@ -469,9 +469,16 @@ export async function POST(req: Request) {
             await addUsage(user.id, counted);
             if (needsTitle) {
               const title = await Promise.race([titlePromise, sleep(5000).then(() => "")]);
-              // fallback: kalau generator gagal/ditolak (output berupa jawaban),
-              // ambil label topik dari jawaban model yang baru saja selesai.
-              const finalTitle = title || sanitizeTitle(assistantText);
+              // rantai fallback: generator prompt -> generator dari isi jawaban (dipaksa
+              // jadi label topik) -> sanitize mentah terakhir (jarang tercapai).
+              // Tuanku/Hamba dkk tidak boleh jadi judul (bug luna, 2026-09-26).
+              let finalTitle = title;
+              if (!finalTitle && assistantText) {
+                finalTitle = await generateTitle(
+                  `Topik pembahasan:\n${assistantText.slice(0, 700)}`,
+                ).catch(() => "");
+              }
+              if (!finalTitle && assistantText) finalTitle = sanitizeTitle(assistantText);
               if (finalTitle) {
                 await db()`UPDATE sessions SET title = ${finalTitle} WHERE id = ${sessionId} AND title = 'New chat'`;
               }
