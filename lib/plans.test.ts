@@ -1,6 +1,14 @@
 // language: TypeScript, file: lib/plans.test.ts, target: vitest — hak akses model per paket
 import { describe, it, expect } from "vitest";
-import { allowedModels, effectivePlan, modelAllowed, PLAN_MODELS } from "./plans";
+import {
+  allowedModels,
+  effectivePlan,
+  FREE_TOKEN_LIMIT,
+  modelAllowed,
+  PLAN_MODELS,
+  PLAN_LIMIT_PERCENT,
+  planTokenLimit,
+} from "./plans";
 
 describe("paket model", () => {
   it("free hanya 1.1; pro menambah 1.5 selenia+solaria; max menambah asteria+celestia+istaroth", () => {
@@ -50,5 +58,18 @@ describe("paket model", () => {
     (["free", "pro", "max"] as const).forEach((p) => {
       expect(allowedModels(p)).toContain("onheil-1.1-luna");
     });
+  });
+
+  it("limit token diturunkan dari paket Standard: free 1jt, pro 2x free, max 5x pro", () => {
+    expect(FREE_TOKEN_LIMIT).toBe(1_000_000);
+    expect(planTokenLimit("free")).toBe(1_000_000);
+    expect(planTokenLimit("pro")).toBe(2_000_000);
+    expect(planTokenLimit("max")).toBe(10_000_000);
+    expect(planTokenLimit("pro")).toBe(2 * planTokenLimit("free"));
+    expect(planTokenLimit("max")).toBe(5 * planTokenLimit("pro"));
+  });
+
+  it("persentase limit selalu 100% — yang membedakan plan hanya token", () => {
+    expect(PLAN_LIMIT_PERCENT).toBe(100);
   });
 });

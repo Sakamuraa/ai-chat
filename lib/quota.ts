@@ -1,11 +1,15 @@
 // language: TypeScript, file: lib/quota.ts, target: aturan kuota token (murni, gampang dites)
+import { FREE_TOKEN_LIMIT } from "./plans";
 /**
- * Kebijakan (permintaan Manuel, 2026-09-24):
- *  - Batas dasar: DAILY_TOKEN_LIMIT token per hari UTC (default 10 juta).
+ * Kebijakan (permintaan Manuel, 2026-09-24; dirapikan 2026-09-26):
+ *  - Batas dasar (free/Standard) = FREE_TOKEN_LIMIT token per hari UTC (1 juta),
+ *    diambil dari lib/plans.ts — tidak ada angka hardcoded di sini.
  *  - Punya langganan aktif -> langganan MENGANTIKAN batas harian:
  *      * token_limit = NULL (unlimited)  -> bebas sampai valid_until
  *      * token_limit = N                 -> N token untuk seluruh jendela langganan,
- *                                            sisa token menyusut tiap chat
+ *                                            sisa token menyusut tiap chat.
+ *                                            N dihitung dari plan (planTokenLimit),
+ *                                            bukan input manual.
  *  - Tanpa langganan -> pakai batas harian.
  */
 
@@ -20,9 +24,8 @@ export type QuotaVerdict =
   | { ok: false; kind: "daily_exceeded" | "sub_exhausted" };
 
 export function dailyTokenLimit(): number {
-  const raw = process.env.DAILY_TOKEN_LIMIT;
-  const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 10_000_000;
+  // Kuota harian free = batas paket Standard (satu sumber: lib/plans.ts).
+  return FREE_TOKEN_LIMIT;
 }
 
 export function checkQuota(state: QuotaState, now: Date = new Date()): QuotaVerdict {

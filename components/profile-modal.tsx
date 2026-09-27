@@ -7,7 +7,8 @@ import { SignOut, X } from "@phosphor-icons/react";
 import { useI18n } from "./i18n";
 import { LANGS } from "@/lib/i18n";
 import { BrandMark } from "./sidebar";
-import { TOKEN_OPTIONS, DURATION_OPTIONS, formatTokens } from "@/lib/sub-options";
+import { DURATION_OPTIONS, formatTokens } from "@/lib/sub-options";
+import { PLAN_LIMIT_PERCENT } from "@/lib/plans";
 
 export type Me = {
   id: string;
@@ -61,7 +62,6 @@ export default function ProfileModal({
   const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [plan, setPlan] = useState<string>("free");
   const [pickPlan, setPickPlan] = useState<"free" | "pro" | "max">("free");
-  const [pickToken, setPickToken] = useState<number | null>(TOKEN_OPTIONS[0].value);
   const [pickHours, setPickHours] = useState<number>(DURATION_OPTIONS[0].hours);
   const [newCode, setNewCode] = useState("");
   const [codes, setCodes] = useState<{
@@ -155,7 +155,7 @@ export default function ProfileModal({
       const res = await fetch("/api/subscriptions/codes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tokenLimit: pickToken, durationHours: pickHours, plan: pickPlan }),
+        body: JSON.stringify({ durationHours: pickHours, plan: pickPlan }),
       });
       if (res.ok) {
         const b = (await res.json()) as { code: string };
@@ -495,19 +495,11 @@ export default function ProfileModal({
         <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-4">
           <p className="text-sm font-medium">{t("sub.section")}</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {t("sub.dailyQuota", { n: (quota?.dailyLimit ?? 10_000_000).toLocaleString("id-ID") })}
+            {t("sub.limit", { n: PLAN_LIMIT_PERCENT })}
           </p>
           <p className="mt-1 flex items-center gap-2 text-xs text-[var(--muted)]">
             <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--fg)]">
               {t("sub.plan")}: {plan === "pro" ? t("sub.planPro") : plan === "max" ? t("sub.planMax") : t("sub.planFree")}
-            </span>
-            <span data-testid="live-remaining">
-              {t("sub.liveRemaining")}:{" "}
-              <b className="text-[var(--fg)]">
-                {quota?.unlimited
-                  ? t("sub.unlimited")
-                  : (quota?.remaining ?? 0).toLocaleString("id-ID")}
-              </b>
             </span>
           </p>
 
@@ -515,8 +507,7 @@ export default function ProfileModal({
             <div className="mt-3 space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm">
               <p className="font-medium text-[var(--fg)]">{t("sub.active")}</p>
               <p className="text-xs text-[var(--muted)]">
-                {t("sub.tokens")}: <b>{formatTokens(quota.sub.tokenLimit)}</b>
-                {quota.sub.tokenLimit === null ? "" : ` · ${t("sub.remaining")}: ${formatTokens(quota.sub.remaining)}`}
+                {t("sub.limit", { n: PLAN_LIMIT_PERCENT })}
               </p>
               <p className="text-xs text-[var(--muted)]">
                 {t("sub.validUntil")}: {new Date(quota.sub.validUntil).toLocaleString("id-ID")}
@@ -563,23 +554,7 @@ export default function ProfileModal({
           <div className="rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-4">
             <p className="text-sm font-medium">{t("sub.manage")}</p>
 
-            <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.tokenPick")}</p>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {TOKEN_OPTIONS.map((o) => (
-                <button
-                  key={String(o.value)}
-                  onClick={() => setPickToken(o.value)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                    pickToken === o.value
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--fg)]"
-                      : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-
+            <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.limitInfo")}</p>
             <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.planPick")}</p>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {(["free", "pro", "max"] as const).map((pl) => (

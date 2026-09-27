@@ -2,10 +2,10 @@
 import { randomBytes } from "node:crypto";
 import { db } from "./db";
 import { dailyTokenLimit, type QuotaState } from "./quota";
-import { allowedModels, effectivePlan, type Plan } from "./plans";
+import { allowedModels, effectivePlan, planTokenLimit, type Plan } from "./plans";
 
-export { TOKEN_OPTIONS, DURATION_OPTIONS } from "./sub-options";
-import { TOKEN_OPTIONS, DURATION_OPTIONS } from "./sub-options";
+export { DURATION_OPTIONS } from "./sub-options";
+import { DURATION_OPTIONS } from "./sub-options";
 
 export type SubRow = {
   token_limit: number | null;
@@ -85,13 +85,14 @@ function genCode(): string {
   return `TOF-${randomBytes(4).toString("hex").toUpperCase()}-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
-/** Buat satu kode langganan (hanya admin). token_limit null = unlimited. */
+/** Buat satu kode langganan (hanya admin). token_limit dihitung dari plan —
+ *  admin hanya memilih paket + masa berlaku (permintaan Manuel, 2026-09-26). */
 export async function createCode(
   adminId: string,
-  tokenLimit: number | null,
   durationHours: number,
   plan: Plan,
 ): Promise<string> {
+  const tokenLimit = planTokenLimit(plan);
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = genCode();
     try {

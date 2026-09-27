@@ -49,16 +49,12 @@ describe("checkQuota", () => {
 });
 
 describe("dailyTokenLimit", () => {
-  it("default 10 juta", () => {
-    const prev = process.env.DAILY_TOKEN_LIMIT;
-    delete process.env.DAILY_TOKEN_LIMIT;
-    expect(dailyTokenLimit()).toBe(10_000_000);
+  it("ikut paket Standard di lib/plans.ts (1 juta), env tidak berpengaruh", () => {
+    expect(dailyTokenLimit()).toBe(1_000_000);
     process.env.DAILY_TOKEN_LIMIT = "5000000";
-    expect(dailyTokenLimit()).toBe(5_000_000);
-    process.env.DAILY_TOKEN_LIMIT = "0";
-    expect(dailyTokenLimit()).toBe(10_000_000); // nilai rusak -> kembali default
-    if (prev === undefined) delete process.env.DAILY_TOKEN_LIMIT;
-    else process.env.DAILY_TOKEN_LIMIT = prev;
+    expect(dailyTokenLimit()).toBe(1_000_000); // env tak lagi jadi sumber angka
+    delete process.env.DAILY_TOKEN_LIMIT;
+    expect(dailyTokenLimit()).toBe(1_000_000);
   });
 });
 

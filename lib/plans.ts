@@ -14,6 +14,27 @@ export const PLANS: { id: Plan; label: string }[] = [
   { id: "max", label: "Max" },
 ];
 
+/** Limit token per plan — SATU sumber angka (permintaan Manuel, 2026-09-26):
+ *  Standard (free) = 1 juta · Pro = 2× free · Max = 5× pro (10× free).
+ *  Persentase limit SELALU 100% untuk semua plan — yang membedakan hanya token.
+ *  Semua informasi — kuota harian, kode langganan admin, tampilan user —
+ *  diturunkan dari sini, tidak diinput/di-hardcode terpisah. */
+export const FREE_TOKEN_LIMIT = 1_000_000;
+const LIMIT_MULTIPLIER: Record<Plan, number> = { free: 1, pro: 2, max: 10 };
+
+/** Total token satu langganan untuk plan ini (dipakai createCode). */
+export function planTokenLimit(p: Plan): number {
+  return FREE_TOKEN_LIMIT * LIMIT_MULTIPLIER[p];
+}
+
+/** Limit tampil selalu 100% — persen bukan skala antar plan (koreksi Manuel). */
+export const PLAN_LIMIT_PERCENT = 100;
+
+/** Amankan nilai mentah (dari DB) jadi Plan valid. */
+export function coercePlan(v: string | null | undefined): Plan {
+  return isPlan(v) ? v : "free";
+}
+
 export const MODEL_LABELS: Record<string, string> = {
   "onheil-1.1-luna": "Onheil 1.1 Luna",
   "onheil-1.1-aria": "Onheil 1.1 Aria",
