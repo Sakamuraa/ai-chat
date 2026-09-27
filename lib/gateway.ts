@@ -142,10 +142,30 @@ export function titleLooksLikeCopy(title: string, source: string): boolean {
 const TITLE_RULES =
   "You name chat sessions. Reply with 3 to 5 words, Title Case, plain words only. " +
   "NO markdown, NO quotes, NO symbols, NO punctuation, NO explanation. Words separated by single spaces. " +
+  "NEVER answer the user's question and NEVER say what you can or cannot see - you are labeling, not replying. " +
   "NEVER copy, repeat, translate or lightly trim the user's own words - write a fresh TOPIC label instead. " +
   "Examples: user says 'halo kamu siapa' -> 'Pembukaan Percakapan'; " +
   "user says 'buatkan template paper progress web app' -> 'Template Paper Webapp'; " +
-  "user says 'kenapa file docx tidak bisa dibuka' -> 'Dokumen Docx Gagal'.";
+  "user says 'kenapa file docx tidak bisa dibuka' -> 'Dokumen Docx Gagal'; " +
+  "user says 'jelasin gambar ini' with an attached image -> 'Penjelasan Gambar'.";
+
+/**
+ * Tangkap output model title yang ternyata MENJAWAB pertanyaan user
+ * (bug: prompt 'jelasin gambar ini' + lampiran -> model balas
+ * 'Saya tidak melihat gambar...' yang terpotong jadi judul sesi).
+ * Judul valid = label topik pendek; jawaban = kalimat berpola respons.
+ */
+export function titleLooksLikeAnswer(raw: string): boolean {
+  const t = normForCompare(raw);
+  if (!t) return false;
+  const respons = [
+    "saya", "aku", "maaf", "tidak melihat", "tidak bisa", "tidak dapat", "tidak nampak",
+    "tidak punya", "tidak mengerti", "berdasarkan", "gambar ini", "gambarnya",
+    "i cannot", "i can t", "i don t", "sorry", "based on", "this image", "the image",
+  ];
+  if (respons.some((p) => t.includes(p))) return true;
+  return t.split(" ").filter(Boolean).length > 6; // judul 3-5 kata; >6 = kalimat
+}
 
 /**
  * Judul = ringkasan/topik pembahasan (permintaan Manuel), maksimal 5 kata.
@@ -172,6 +192,7 @@ export async function generateTitle(exchange: string): Promise<string> {
     for (const model of candidates) {
       try {
         const out = await completeChat(model, [passes[pass], user]);
+        if (titleLooksLikeAnswer(out)) continue; // model menjawab, bukan bikin judul
         const title = sanitizeTitle(out);
         if (!title) continue;
         if (titleLooksLikeCopy(title, exchange)) continue; // salinan -> coba lagi

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import { streamChat, generateTitle, type ChatMsg, type ChatPart } from "@/lib/gateway";
+import { streamChat, generateTitle, sanitizeTitle, type ChatMsg, type ChatPart } from "@/lib/gateway";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { checkQuota, estimateTokens } from "@/lib/quota";
 import { modelAllowed } from "@/lib/plans";
@@ -469,8 +469,11 @@ export async function POST(req: Request) {
             await addUsage(user.id, counted);
             if (needsTitle) {
               const title = await Promise.race([titlePromise, sleep(5000).then(() => "")]);
-              if (title) {
-                await db()`UPDATE sessions SET title = ${title} WHERE id = ${sessionId} AND title = 'New chat'`;
+              // fallback: kalau generator gagal/ditolak (output berupa jawaban),
+              // ambil label topik dari jawaban model yang baru saja selesai.
+              const finalTitle = title || sanitizeTitle(assistantText);
+              if (finalTitle) {
+                await db()`UPDATE sessions SET title = ${finalTitle} WHERE id = ${sessionId} AND title = 'New chat'`;
               }
             }
           } catch (e) {
