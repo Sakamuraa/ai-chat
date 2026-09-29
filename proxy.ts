@@ -10,6 +10,7 @@ const PUBLIC_API = ["/api/auth/"];
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 // ===== GATE PENGEMBANGAN (hapus blok ini + /gate + /api/gate saat rilis) =====
+const GATE_ENABLED = false; // production — balikkan ke true hanya bila gate pengembangan dibutuhkan lagi
 const GATE_HASH = "875e8b82b5c01fca0973ea93a946a81678d6b84d029a186659cc5b52449481e4";
 const GATE_EXEMPT = ["/gate", "/api/gate"];
 function isAsset(pathname: string): boolean {
@@ -27,7 +28,7 @@ export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // --- gate: semua rute butuh cookie gate (kecuali halaman gate & aset)
-  if (!isAsset(pathname) && !GATE_EXEMPT.some((p) => pathname === p)) {
+  if (GATE_ENABLED && !isAsset(pathname) && !GATE_EXEMPT.some((p) => pathname === p)) {
     const passed = req.cookies.get("gate")?.value === GATE_HASH;
     if (!passed) {
       if (pathname.startsWith("/api/")) {

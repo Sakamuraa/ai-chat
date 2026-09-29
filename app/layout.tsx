@@ -5,6 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppChrome from "@/components/app-chrome";
 import Sidebar from "@/components/sidebar";
+import WelcomeModal from "@/components/welcome-modal";
 
 const sans = Geist({
   subsets: ["latin"],
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Sidebar />
             <main className="relative flex min-w-0 flex-1 flex-col">{children}</main>
           </div>
+          <WelcomeModal />
         </AppChrome>
       </body>
     </html>
