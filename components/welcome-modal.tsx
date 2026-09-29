@@ -40,14 +40,14 @@ export default function WelcomeModal() {
           <BrandMark size={32} />
           <div className="min-w-0">
             <h2 className="text-lg font-semibold">Welcome!</h2>
-            <p className="text-sm text-[var(--muted)]">Selamat datang di OnheilAI, Tuanku.</p>
+            <p className="text-sm text-[var(--muted)]">You&apos;re all set — here&apos;s what you can do.</p>
           </div>
         </div>
 
         <p className="mb-5 text-sm leading-relaxed text-[var(--muted)]">
-          Sesi chat tersimpan otomatis, banyak model bisa dipilih, dokumen (PDF/DOCX/ZIP) dan
-          analisis gambar bisa langsung dibuat dari percakapan. Baru pertama kali? Panduan
-          singkat ada di Docs.
+          Your chats are saved automatically, and you can switch between models anytime. Create
+          documents (PDF, DOCX, ZIP) and analyze images straight from the conversation. New
+          around here? The short guide lives in Docs.
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -56,28 +56,28 @@ export default function WelcomeModal() {
             onClick={dismiss}
             className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)] transition hover:opacity-90"
           >
-            Mulai Ngobrol
+            Start Chatting
           </button>
           <Link
             href="/docs"
             onClick={dismiss}
             className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--fg)] transition hover:bg-[var(--accent-soft)]"
           >
-            📄 Docs
+            Docs
           </Link>
           <Link
             href="/docs/privacy"
             onClick={dismiss}
             className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--fg)] transition hover:bg-[var(--accent-soft)]"
           >
-            Privasi
+            Privacy
           </Link>
           <Link
             href="/docs/terms"
             onClick={dismiss}
             className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--fg)] transition hover:bg-[var(--accent-soft)]"
           >
-            Ketentuan
+            Terms
           </Link>
         </div>
       </div>
