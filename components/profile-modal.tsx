@@ -76,15 +76,7 @@ export default function ProfileModal({
     expired?: boolean;
   }[]>([]);
 
-  // Persen limit TERSISA — berkurang saat token dipakai (dari /api/usage).
-  // Sub aktif: sisa token sub / total token sub. Tanpa sub: sisa harian / limit harian.
-  const subPct = quota?.sub
-    ? quota.sub.tokenLimit && quota.sub.remaining !== null
-      ? Math.max(0, Math.min(100, Math.round((quota.sub.remaining / quota.sub.tokenLimit) * 100)))
-      : 100 // tokenLimit null = unlimited
-    : null;
-  // dua bar jendela ala Claude — SELALU tampil, pakai angka jendela apa adanya
-  // (sisa langganan punya blok info sendiri di bawah, tidak dicampur ke sini)
+  // dua bar jendela ala Claude — satu-satunya tampilan kuota di /#settings
   const pctOf = (limit: number, used: number) =>
     limit > 0
       ? Math.max(0, Math.min(100, Math.round(((limit - used) / limit) * 100)))
@@ -552,24 +544,11 @@ export default function ProfileModal({
             </span>
           </p>
 
-          {quota?.sub ? (
-            <div className="mt-3 space-y-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm">
-              <p className="font-medium text-[var(--fg)]">{t("sub.active")}</p>
-              <p className="text-xs text-[var(--muted)]">
-                {t("sub.limit", { n: subPct ?? PLAN_LIMIT_PERCENT })}
-              </p>
-              <p className="text-xs text-[var(--muted)]">
-                {t("sub.validUntil")}: {new Date(quota.sub.validUntil).toLocaleString("id-ID")}
-              </p>
-              {quota.sub.sourceCode ? (
-                <p className="text-xs text-[var(--faint)]">
-                  {t("sub.source")}: {quota.sub.sourceCode}
-                </p>
-              ) : null}
-            </div>
-          ) : (
+          {/* info langganan (sisa token + tanggal berlaku) dihapus:
+              kuota = dua bar di atas; plan berjalan per bulan tanpa tanggal */}
+          {!quota?.sub ? (
             <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.none")}</p>
-          )}
+          ) : null}
 
           <label htmlFor="pf-code" className="mt-4 block text-[13px] font-medium">
             {t("sub.redeemTitle")}
