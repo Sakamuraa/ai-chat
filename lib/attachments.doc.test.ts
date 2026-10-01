@@ -95,4 +95,24 @@ describe("ekstraksi dokumen", () => {
     const txt = await extractDocText(new File([bytes as BlobPart], "palsu.docx"));
     expect(txt).toBeNull();
   });
+
+  it("Paper.pdf dikenali sebagai teks (regresi: dulu 'Unsupported format')", () => {
+    expect(classifyFile("Paper.pdf", "application/pdf")).toBe("text");
+    expect(classifyFile("paper.pdf", "")).toBe("text"); // tanpa mime pun lolos via ekstensi
+    expect(isDocFile("Paper.pdf")).toBe(true);
+  });
+
+  it("ekstraksi PDF: teks content stream keluar utuh", async () => {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([400, 200]);
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    page.drawText("Halo Paper Uji Coba", { x: 40, y: 120, size: 14, font });
+    const bytes = await doc.save();
+    const txt = await extractDocText(
+      new File([bytes as BlobPart], "Paper.pdf", { type: "application/pdf" }),
+    );
+    expect(txt).toBeTruthy();
+    expect(txt).toContain("Halo Paper");
+  }, 30_000);
 });

@@ -12,8 +12,8 @@ export const TEXT_EXTS = [
 
 export type FileClass = "image" | "text" | "unsupported";
 
-/** Dokumen Office yang diekstrak teksnya di klien (ZIP tanpa dependensi). */
-export const DOC_EXTS = ["docx", "xlsx"];
+/** Dokumen yang teksnya diekstrak di klien (docx/xlsx tanpa dependensi; PDF via pdfjs-dist lazy). */
+export const DOC_EXTS = ["docx", "xlsx", "pdf"];
 
 export function isDocFile(name: string): boolean {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
@@ -194,10 +194,61 @@ function unescapeXml(s: string): string {
 
 const DOC_CAP = 80_000; // batas karakter teks yang dikirim ke model
 
+/** Ekstraksi teks PDF di klien. Lazy import — pdfjs-dist hanya dimuat saat user
+ *  benar-benar memilih .pdf, jadi tak masuk bundle awal. Worker diset via asset
+ *  URL (resep bundler resmi pdfjs: webpack/Turbopack/Vite semua mengenalinya). */
+async function extractPdfText(file: File): Promise<string> {
+  // build legacy: build modern butuh Promise.try (Node < 24 tak punya);
+  // legacy jalan di Node, browser lama, dan vitest dengan perilaku sama
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  if (!("pdfjsWorker" in globalThis)) {
+    // main-thread: handler worker diimpor sebagai modul biasa (bukan Web Worker)
+    // — tanpa asset URL, jadi aman di webpack/Turbopack/Vite/Node sekaligus
+    (globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = await import(
+      "pdfjs-dist/legacy/build/pdf.worker.mjs"
+    );
+  }
+  const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  try {
+    const pages: string[] = [];
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      const lines: string[] = [];
+      let line = "";
+      for (const item of content.items) {
+        if (!("str" in item)) continue; // TextMarkedContent tanpa teks
+        if (item.hasEOL) {
+          lines.push(line + item.str);
+          line = "";
+          continue;
+        }
+        // spasi antar-run: pdfjs tak selalu menyisipkannya utk Tj per-kata
+        if (line && !line.endsWith(" ") && item.str && !item.str.startsWith(" ")) {
+          line += " ";
+        }
+        line += item.str;
+      }
+      if (line) lines.push(line);
+      pages.push(lines.join("\n"));
+    }
+    return pages.join("\n\n");
+  } finally {
+    // pdfjs v6: destroy() dihapus, ganti cleanup()
+    if (typeof doc.cleanup === "function") doc.cleanup();
+  }
+}
+
 export async function extractDocText(file: File): Promise<string | null> {
   const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
   if (!DOC_EXTS.includes(ext)) return null;
   try {
+    if (ext === "pdf") {
+      // bukan ZIP — jangan masuk jalur parsing zipEntries
+      const raw = (await extractPdfText(file)).replace(/\n{3,}/g, "\n\n").trim();
+      if (!raw) return null;
+      return raw.length > DOC_CAP ? raw.slice(0, DOC_CAP) + "\n…[dokumen dipotong]" : raw;
+    }
     const ab = await file.arrayBuffer();
     const u8 = new Uint8Array(ab);
     const dv = new DataView(ab);
