@@ -115,17 +115,17 @@ describe("period id", () => {
   });
 });
 
-describe("limit per plan (2026-10-01: base 500 rb)", () => {
-  it("jendela 5 jam: free 500 rb · pro 1 jt · max 5 jt", () => {
+describe("limit per plan (2026-10-01: base 500 rb, pro 3×)", () => {
+  it("jendela 5 jam: free 500 rb · pro 1,5 jt · max 5 jt", () => {
     expect(fiveHourTokenLimit("free")).toBe(500_000);
-    expect(fiveHourTokenLimit("pro")).toBe(1_000_000);
+    expect(fiveHourTokenLimit("pro")).toBe(1_500_000);
     expect(fiveHourTokenLimit("max")).toBe(5_000_000);
     expect(fiveHourTokenLimit()).toBe(500_000); // default = free
   });
 
-  it("mingguan = 10× jendela 5 jam: 5 jt · 10 jt · 50 jt", () => {
+  it("mingguan = 10× jendela 5 jam: 5 jt · 15 jt · 50 jt", () => {
     expect(weeklyTokenLimit("free")).toBe(5_000_000);
-    expect(weeklyTokenLimit("pro")).toBe(10_000_000);
+    expect(weeklyTokenLimit("pro")).toBe(15_000_000);
     expect(weeklyTokenLimit("max")).toBe(50_000_000);
     expect(weeklyTokenLimit()).toBe(5_000_000); // default = free
   });

@@ -70,13 +70,13 @@ describe("paket model", () => {
     });
   });
 
-  it("limit token diturunkan dari paket Standard: free 1jt, pro 2x free, max 5x pro", () => {
+  it("limit token diturunkan dari paket Standard: free 500rb, pro 3x free, max 10x free", () => {
     expect(FREE_TOKEN_LIMIT).toBe(500_000);
     expect(planTokenLimit("free")).toBe(500_000);
-    expect(planTokenLimit("pro")).toBe(1_000_000);
+    expect(planTokenLimit("pro")).toBe(1_500_000);
     expect(planTokenLimit("max")).toBe(5_000_000);
-    expect(planTokenLimit("pro")).toBe(2 * planTokenLimit("free"));
-    expect(planTokenLimit("max")).toBe(5 * planTokenLimit("pro"));
+    expect(planTokenLimit("pro")).toBe(3 * planTokenLimit("free"));
+    expect(planTokenLimit("max")).toBe(10 * planTokenLimit("free"));
   });
 
   it("persentase limit selalu 100% — yang membedakan plan hanya token", () => {

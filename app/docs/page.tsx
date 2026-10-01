@@ -72,7 +72,7 @@ const KEMAMPUAN = [
 ];
 
 const BATAS = [
-  "Kuota token mengikuti pola Claude, beda per paket. Jendela 5 jam (reset tiap 5 jam): Standard 500 rb · Pro 1 jt · Max 5 jt. Mingguan (reset tiap Senin 00.00 UTC): Standard 5 jt · Pro 10 jt · Max 50 jt. Punya langganan aktif memakai sisa token langganan.",
+  "Kuota token mengikuti pola Claude, beda per paket. Jendela 5 jam (reset tiap 5 jam): Standard 500 rb · Pro 1,5 jt · Max 5 jt. Mingguan (reset tiap Senin 00.00 UTC): Standard 5 jt · Pro 15 jt · Max 50 jt. Punya langganan aktif memakai sisa token langganan.",
   "Maksimal 15 chat per 10 menit per akun dan 30 per 10 menit per alamat IP.",
   "Judul sesi dibuat otomatis dari isi percakapan, bukan disalin dari prompt pertama.",
   "Sesi, pesan, dan lampiran tersimpan di akunmu dan bisa dihapus kapan saja dari aplikasi.",

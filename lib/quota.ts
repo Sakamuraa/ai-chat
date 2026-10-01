@@ -5,10 +5,10 @@ import { planTokenLimit, type Plan } from "./plans";
  * 2026-10-01: base 500 rb + beda per plan):
  *  - Tanpa langganan ada DUA jendela yang dicek bersama-sama:
  *      * jendela 5 jam  : limit per plan (lib/plans.ts):
- *          Standard 500 rb · Pro 1 jt · Max 5 jt per window.
+ *          Standard 500 rb · Pro 1,5 jt · Max 5 jt per window.
  *        Period dihitung tetap: floor(epoch_ms / 5 jam) — reset wal-clock tiap 5 jam.
  *      * mingguan        : limit = 10× jendela 5 jam:
- *          Standard 5 jt · Pro 10 jt · Max 50 jt per minggu.
+ *          Standard 5 jt · Pro 15 jt · Max 50 jt per minggu.
  *        Period = tanggal Senin UTC — reset tiap Senin 00.00 UTC.
  *    Lolos KEDUA jendela baru boleh chat; salah satu penuh -> 429.
  *  - Punya langganan aktif -> langganan MENGANTIKAN jendela (sama seperti sistem lama):
@@ -32,14 +32,14 @@ export type QuotaVerdict =
   | { ok: false; kind: "five_hour_exceeded" | "weekly_exceeded" | "sub_exhausted" };
 
 /** Limit jendela 5 jam per plan (satu sumber: lib/plans.ts).
- *  Standard 500 rb · Pro 1 jt · Max 5 jt per window. */
+ *  Standard 500 rb · Pro 1,5 jt · Max 5 jt per window. */
 export function fiveHourTokenLimit(plan: Plan = "free"): number {
   return planTokenLimit(plan);
 }
 
 /** Limit mingguan per plan = 10× jendela 5 jam (≈2 hari pemakaian penuh per
  *  minggu — tidak kebanyakan, tidak kedikitan):
- *  Standard 5 jt · Pro 10 jt · Max 50 jt. */
+ *  Standard 5 jt · Pro 15 jt · Max 50 jt. */
 export function weeklyTokenLimit(plan: Plan = "free"): number {
   return fiveHourTokenLimit(plan) * 10;
 }
