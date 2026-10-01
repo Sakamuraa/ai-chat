@@ -54,10 +54,9 @@ export default function ProfileModal({
   // langganan + kuota
   const [quota, setQuota] = useState<{
     dailyLimit: number;
-    remaining: number | null;
-    unlimited: boolean;
+    dailyUsed: number;
     weeklyLimit: number;
-    weeklyRemaining: number | null;
+    weeklyUsed: number;
     sub: { tokenLimit: number | null; remaining: number | null; validUntil: string; sourceCode: string | null } | null;
   } | null>(null);
   const [redeemCode, setRedeemCode] = useState("");
@@ -84,22 +83,14 @@ export default function ProfileModal({
       ? Math.max(0, Math.min(100, Math.round((quota.sub.remaining / quota.sub.tokenLimit) * 100)))
       : 100 // tokenLimit null = unlimited
     : null;
-  const limitPct =
-    subPct ??
-    (quota
-      ? quota.unlimited
-        ? 100
-        : quota.remaining !== null && quota.dailyLimit > 0
-          ? Math.max(0, Math.min(100, Math.round((quota.remaining / quota.dailyLimit) * 100)))
-          : PLAN_LIMIT_PERCENT
-      : PLAN_LIMIT_PERCENT);
-  // baris kedua = kuota mingguan (hanya saat tidak ada langganan aktif)
-  const weeklyPct =
-    !quota || quota.sub || quota.unlimited
-      ? null
-      : quota.weeklyRemaining !== null && quota.weeklyLimit > 0
-        ? Math.max(0, Math.min(100, Math.round((quota.weeklyRemaining / quota.weeklyLimit) * 100)))
-        : PLAN_LIMIT_PERCENT;
+  // dua bar jendela ala Claude — SELALU tampil, pakai angka jendela apa adanya
+  // (sisa langganan punya blok info sendiri di bawah, tidak dicampur ke sini)
+  const pctOf = (limit: number, used: number) =>
+    limit > 0
+      ? Math.max(0, Math.min(100, Math.round(((limit - used) / limit) * 100)))
+      : PLAN_LIMIT_PERCENT;
+  const limitPct = quota ? pctOf(quota.dailyLimit, quota.dailyUsed) : PLAN_LIMIT_PERCENT;
+  const weeklyPct = quota ? pctOf(quota.weeklyLimit, quota.weeklyUsed) : PLAN_LIMIT_PERCENT;
 
   // hash #settings = buka/tutup modal (tanpa route baru)
   useEffect(() => {
@@ -122,20 +113,17 @@ export default function ProfileModal({
       const res = await fetch("/api/subscriptions/me");
       if (!res.ok) return;
       const b = (await res.json()) as {
-        remaining: number | null;
-        unlimited: boolean;
-        dailyLimit: number;
-        weekly: { limit: number; remaining: number | null };
+        fiveHour: { limit: number; used: number };
+        weekly: { limit: number; used: number };
         plan?: string;
         sub: { tokenLimit: number | null; remaining: number | null; validUntil: string; sourceCode: string | null } | null;
       };
       if (b.plan) setPlan(b.plan);
       setQuota({
-        dailyLimit: b.dailyLimit,
-        remaining: b.remaining,
-        unlimited: b.unlimited,
+        dailyLimit: b.fiveHour.limit,
+        dailyUsed: b.fiveHour.used,
         weeklyLimit: b.weekly.limit,
-        weeklyRemaining: b.weekly.remaining,
+        weeklyUsed: b.weekly.used,
         sub: b.sub,
       });
     } catch {
@@ -529,7 +517,7 @@ export default function ProfileModal({
         <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--sidebar)] p-4">
           <p className="text-sm font-medium">{t("sub.section")}</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {quota?.sub ? t("sub.limit", { n: limitPct }) : t("sub.win5h", { n: limitPct })}
+            {t("sub.win5h", { n: limitPct })}
           </p>
           <div
             className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--panel)]"
@@ -544,24 +532,20 @@ export default function ProfileModal({
               style={{ width: `${limitPct}%` }}
             />
           </div>
-          {weeklyPct !== null ? (
-            <>
-              <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.winWeek", { n: weeklyPct })}</p>
-              <div
-                className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--panel)]"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={weeklyPct}
-                data-testid="weekly-limit-bar"
-              >
-                <div
-                  className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-500"
-                  style={{ width: `${weeklyPct}%` }}
-                />
-              </div>
-            </>
-          ) : null}
+          <p className="mt-3 text-xs text-[var(--muted)]">{t("sub.winWeek", { n: weeklyPct })}</p>
+          <div
+            className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--panel)]"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={weeklyPct}
+            data-testid="weekly-limit-bar"
+          >
+            <div
+              className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-500"
+              style={{ width: `${weeklyPct}%` }}
+            />
+          </div>
           <p className="mt-1 flex items-center gap-2 text-xs text-[var(--muted)]">
             <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--fg)]">
               {t("sub.plan")}: {plan === "pro" ? t("sub.planPro") : plan === "max" ? t("sub.planMax") : t("sub.planFree")}
