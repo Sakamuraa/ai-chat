@@ -1,4 +1,4 @@
-// language: TypeScript, file: lib/quota.test.ts, target: tes aturan kuota ala Claude (5 jam + mingguan)
+// language: TypeScript, file: lib/quota.test.ts, target: tes aturan kuota ala Claude (5 jam + mingguan, per plan)
 import { describe, it, expect } from "vitest";
 import {
   checkQuota,
@@ -27,22 +27,34 @@ function base(over: Partial<QuotaState> = {}): QuotaState {
 
 describe("checkQuota (tanpa langganan)", () => {
   it("jendela 5 jam: lolos di bawah limit, mentok di limit", () => {
-    expect(checkQuota(base({ fiveHourUsed: 999_999 }), NOW)).toEqual({ ok: true, kind: "window" });
-    expect(checkQuota(base({ fiveHourUsed: 1_000_000 }), NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
+    expect(checkQuota(base({ fiveHourUsed: fiveHourTokenLimit() - 1 }), NOW)).toEqual({
+      ok: true,
+      kind: "window",
+    });
+    expect(checkQuota(base({ fiveHourUsed: fiveHourTokenLimit() }), NOW)).toEqual({
+      ok: false,
+      kind: "five_hour_exceeded",
+    });
   });
 
   it("mingguan: lolos di bawah limit, mentok di limit", () => {
-    expect(checkQuota(base({ weeklyUsed: 6_999_999 }), NOW)).toEqual({ ok: true, kind: "window" });
-    expect(checkQuota(base({ weeklyUsed: 7_000_000 }), NOW)).toEqual({ ok: false, kind: "weekly_exceeded" });
+    expect(checkQuota(base({ weeklyUsed: weeklyTokenLimit() - 1 }), NOW)).toEqual({
+      ok: true,
+      kind: "window",
+    });
+    expect(checkQuota(base({ weeklyUsed: weeklyTokenLimit() }), NOW)).toEqual({
+      ok: false,
+      kind: "weekly_exceeded",
+    });
   });
 
   it("jendela 5 jam dicek lebih dulu — dua-duanya penuh -> lima jam", () => {
-    const st = base({ fiveHourUsed: 1_000_000, weeklyUsed: 7_000_000 });
+    const st = base({ fiveHourUsed: fiveHourTokenLimit(), weeklyUsed: weeklyTokenLimit() });
     expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
   });
 
   it("jendela 5 jam penuh tapi mingguan masih ada -> tetap ditolak (5 jam menang)", () => {
-    const st = base({ fiveHourUsed: 1_000_000, weeklyUsed: 0 });
+    const st = base({ fiveHourUsed: fiveHourTokenLimit(), weeklyUsed: 0 });
     expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
   });
 });
@@ -74,7 +86,7 @@ describe("checkQuota (dengan langganan)", () => {
 
   it("langganan kadaluarsa -> kembali ke aturan jendela", () => {
     const st = base({
-      fiveHourUsed: 1_000_000,
+      fiveHourUsed: 1_000_000, // ≥ limit free (500 rb) — tetap ditolak
       sub: { tokenLimit: null, remaining: null, validUntil: "2026-01-01T00:00:00Z" },
     });
     expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
@@ -103,10 +115,19 @@ describe("period id", () => {
   });
 });
 
-describe("limit", () => {
-  it("limit jendela 5 jam = 1 juta; mingguan = 7 juta (sumber: lib/plans.ts)", () => {
-    expect(fiveHourTokenLimit()).toBe(1_000_000);
-    expect(weeklyTokenLimit()).toBe(7_000_000);
+describe("limit per plan (2026-10-01: base 500 rb)", () => {
+  it("jendela 5 jam: free 500 rb · pro 1 jt · max 5 jt", () => {
+    expect(fiveHourTokenLimit("free")).toBe(500_000);
+    expect(fiveHourTokenLimit("pro")).toBe(1_000_000);
+    expect(fiveHourTokenLimit("max")).toBe(5_000_000);
+    expect(fiveHourTokenLimit()).toBe(500_000); // default = free
+  });
+
+  it("mingguan = 10× jendela 5 jam: 5 jt · 10 jt · 50 jt", () => {
+    expect(weeklyTokenLimit("free")).toBe(5_000_000);
+    expect(weeklyTokenLimit("pro")).toBe(10_000_000);
+    expect(weeklyTokenLimit("max")).toBe(50_000_000);
+    expect(weeklyTokenLimit()).toBe(5_000_000); // default = free
   });
 });
 
@@ -118,9 +139,10 @@ describe("estimateTokens / remainingWindows", () => {
   });
 
   it("sisa jendela = limit - used; penuh = 0; unlimited = Infinity", () => {
+    // free: limit 5 jam 500 rb, mingguan 5 jt
     expect(remainingWindows(base({ fiveHourUsed: 400_000, weeklyUsed: 1_000_000 }))).toEqual({
-      fiveHour: 600_000,
-      weekly: 6_000_000,
+      fiveHour: 100_000,
+      weekly: 4_000_000,
     });
     expect(remainingWindows(base({ fiveHourUsed: 1_000_000 })).fiveHour).toBe(0);
     expect(

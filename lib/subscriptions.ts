@@ -69,9 +69,9 @@ export async function quotaState(userId: string): Promise<QuotaStateEx> {
   const plan = effectivePlan(acct[0]?.plan, sub[0]?.plan, sub[0]?.valid_until);
   return {
     fiveHourUsed: Number(h[0]?.tokens ?? 0),
-    fiveHourLimit: fiveHourTokenLimit(),
+    fiveHourLimit: fiveHourTokenLimit(plan),
     weeklyUsed: Number(w[0]?.tokens ?? 0),
-    weeklyLimit: weeklyTokenLimit(),
+    weeklyLimit: weeklyTokenLimit(plan),
     plan,
     models: allowedModels(plan),
     sub: sub[0]

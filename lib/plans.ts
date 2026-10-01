@@ -17,12 +17,13 @@ export const PLANS: { id: Plan; label: string }[] = [
   { id: "max", label: "Max" },
 ];
 
-/** Limit token per plan — SATU sumber angka (permintaan Manuel, 2026-09-26):
- *  Standard (free) = 1 juta · Pro = 2× free · Max = 5× pro (10× free).
+/** Limit token per plan — SATU sumber angka (permintaan Manuel, 2026-09-26;
+ *  2026-10-01 base diturunkan ke 500 rb):
+ *  Standard (free) = 500 rb · Pro = 2× free (1 jt) · Max = 10× free (5 jt).
+ *  Dipakai jendela kuota (5 jam/mingguan) DAN sisa token kode langganan.
  *  Persentase limit SELALU 100% untuk semua plan — yang membedakan hanya token.
- *  Semua informasi — kuota harian, kode langganan admin, tampilan user —
- *  diturunkan dari sini, tidak diinput/di-hardcode terpisah. */
-export const FREE_TOKEN_LIMIT = 1_000_000;
+ *  Semua informasi diturunkan dari sini, tidak diinput/di-hardcode terpisah. */
+export const FREE_TOKEN_LIMIT = 500_000;
 const LIMIT_MULTIPLIER: Record<Plan, number> = { free: 1, pro: 2, max: 10 };
 
 /** Total token satu langganan untuk plan ini (dipakai createCode). */
