@@ -33,28 +33,22 @@ const MODELS: ModelInfo[] = [
     cocok: "Penulisan panjang, analisis bertahap, dan percakapan yang sambung menyambung.",
   },
   {
-    id: "onheil-1.5-solaria",
-    ringkas:
-      "Model penalaran OnheilAI. Lebih banyak berpikir sebelum menjawab, cocok untuk soal yang butuh langkah.",
-    cocok: "Soal logika, perencanaan, dan pertanyaan yang butuh penjelasan berlapis.",
-  },
-  {
     id: "onheil-2-asteria",
     ringkas:
       "Model generasi kedua dengan penalaran terdalam di OnheilAI. Dipakai untuk tugas berat: arsitektur, keputusan rumit, dan kerja lintas-bagian.",
     cocok: "Desain sistem, kode besar, riset, dan tugas yang tak boleh meleset.",
   },
   {
-    id: "onheil-2.5-celestia",
+    id: "claude-opus-5-5",
     ringkas:
-      "Model terbaru dan terkuat di lini Onheil. Konteks panjang, instruksi panjang, dan hasil paling konsisten.",
-    cocok: "Tugas kompleks dengan banyak aturan, dokumen panjang, dan pekerjaan penting.",
+      "Model Claude Anthropic di paket Max. Penalaran terkuat di OnheilAI: konteks panjang, instruksi kompleks, dan hasil paling konsisten.",
+    cocok: "Arsitektur, debugging berat, dokumen panjang, dan pekerjaan penting yang tak boleh meleset.",
   },
   {
-    id: "onheil-3-istaroth",
+    id: "claude-fable-5-1",
     ringkas:
-      "Model generasi ketiga OnheilAI. Menyatu dengan pencarian web bawaan, jadi jawabannya selalu membawa data terkini tanpa menunggu tool tambahan.",
-    cocok: "Riset terkini, perbandingan produk, berita, dan pertanyaan yang butuh fakta hari ini.",
+      "Claude Fable 5.1 (paket Max) — penalaran Claude dengan tempo cepat, tetap tajam untuk konteks panjang dan instruksi berlapis.",
+    cocok: "Diskusi teknis, refaktor cepat, penulisan panjang, dan pertanyaan yang butuh banyak konteks.",
   },
 ];
 
@@ -78,7 +72,7 @@ const KEMAMPUAN = [
 ];
 
 const BATAS = [
-  "Kuota token 10 juta per 24 jam untuk akun Standard, kecuali punya langganan aktif.",
+  "Kuota token mengikuti pola Claude: 1 juta token per jendela 5 jam (reset tiap 5 jam) dan 7 juta token per minggu (reset tiap Senin 00.00 UTC), kecuali punya langganan aktif.",
   "Maksimal 15 chat per 10 menit per akun dan 30 per 10 menit per alamat IP.",
   "Judul sesi dibuat otomatis dari isi percakapan, bukan disalin dari prompt pertama.",
   "Sesi, pesan, dan lampiran tersimpan di akunmu dan bisa dihapus kapan saja dari aplikasi.",

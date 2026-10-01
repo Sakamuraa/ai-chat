@@ -10,10 +10,9 @@ export const MODELS = [
   { id: "onheil-1.1-luna", label: "Onheil 1.1 Luna" },
   { id: "onheil-1.1-aria", label: "Onheil 1.1 Aria" },
   { id: "onheil-1.5-selenia", label: "Onheil 1.5 Selenia" },
-  { id: "onheil-1.5-solaria", label: "Onheil 1.5 Solaria" },
   { id: "onheil-2-asteria", label: "Onheil 2 Asteria" },
-  { id: "onheil-2.5-celestia", label: "Onheil 2.5 Celestia" },
-  { id: "onheil-3-istaroth", label: "Onheil 3 Istaroth" },
+  { id: "claude-opus-5-5", label: "Claude Opus 5.5" },
+  { id: "claude-fable-5-1", label: "Claude Fable 5.1" },
 ] as const;
 
 export function modelsFor(plan: string): ModelOption[] {

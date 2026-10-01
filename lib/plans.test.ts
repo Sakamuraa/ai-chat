@@ -11,29 +11,39 @@ import {
 } from "./plans";
 
 describe("paket model", () => {
-  it("free hanya 1.1; pro menambah 1.5 selenia+solaria; max menambah asteria+celestia+istaroth", () => {
+  it("free = luna+aria; pro menambah selenia+asteria; max menambah 2 model Claude", () => {
     expect(PLAN_MODELS.free).toEqual(["onheil-1.1-luna", "onheil-1.1-aria"]);
-    expect(PLAN_MODELS.pro).toEqual(["onheil-1.1-luna", "onheil-1.1-aria", "onheil-1.5-selenia", "onheil-1.5-solaria"]);
+    expect(PLAN_MODELS.pro).toEqual([
+      "onheil-1.1-luna",
+      "onheil-1.1-aria",
+      "onheil-1.5-selenia",
+      "onheil-2-asteria",
+    ]);
     expect(PLAN_MODELS.max).toEqual([
       "onheil-1.1-luna",
       "onheil-1.1-aria",
       "onheil-1.5-selenia",
-      "onheil-1.5-solaria",
       "onheil-2-asteria",
-      "onheil-2.5-celestia",
-      "onheil-3-istaroth",
+      "claude-opus-5-5",
+      "claude-fable-5-1",
     ]);
   });
 
   it("model dibatasi paket", () => {
     expect(modelAllowed("free", "onheil-1.5-selenia")).toBe(false);
+    expect(modelAllowed("free", "onheil-2-asteria")).toBe(false);
     expect(modelAllowed("pro", "onheil-1.5-selenia")).toBe(true);
-    expect(modelAllowed("pro", "onheil-2-asteria")).toBe(false);
-    expect(modelAllowed("max", "onheil-2-asteria")).toBe(true);
-    expect(modelAllowed("pro", "onheil-1.5-solaria")).toBe(true);
-    expect(modelAllowed("pro", "onheil-2.5-celestia")).toBe(false);
-    expect(modelAllowed("max", "onheil-2.5-celestia")).toBe(true);
-    expect(modelAllowed("free", "onheil-1.5-solaria")).toBe(false);
+    expect(modelAllowed("pro", "onheil-2-asteria")).toBe(true);
+    expect(modelAllowed("pro", "claude-opus-5-5")).toBe(false);
+    expect(modelAllowed("max", "claude-opus-5-5")).toBe(true);
+    expect(modelAllowed("free", "claude-opus-5-5")).toBe(false);
+    expect(modelAllowed("pro", "claude-fable-5-1")).toBe(false);
+    expect(modelAllowed("max", "claude-fable-5-1")).toBe(true);
+    expect(modelAllowed("free", "claude-fable-5-1")).toBe(false);
+    // model yang dihapus dari daftar frontend tidak lolos paket mana pun
+    expect(modelAllowed("max", "onheil-1.5-solaria")).toBe(false);
+    expect(modelAllowed("max", "onheil-2.5-celestia")).toBe(false);
+    expect(modelAllowed("max", "onheil-3-istaroth")).toBe(false);
   });
 
   it("pakai langganan aktif untuk menaikkan paket", () => {

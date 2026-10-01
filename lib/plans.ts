@@ -1,10 +1,13 @@
 // language: TypeScript, file: lib/plans.ts, target: hak akses model per paket (client & server)
 /**
- * Paket (permintaan Manuel, 2026-09-24):
- *   free -> onheil-1.1-luna
- *   pro  -> + onheil-1.5-selenia
- *   max  -> + onheil-2-asteria, onheil-2.5-celestia, onheil-3-istaroth (permintaan Manuel, 2026-09-25)
- * Paket efektif = paket dari langganan aktif, kalau tidak ada -> paket bawaan akun.
+ * Paket (permintaan Manuel, 2026-09-24; dirapikan 2026-09-30):
+ *   free -> onheil-1.1-luna, onheil-1.1-aria
+ *   pro  -> + onheil-1.5-selenia, onheil-2-asteria
+ *   max  -> + claude-opus-5-5, claude-fable-5-1
+ * 2026-09-30 (hanya frontend): solaria, celestia, istaroth DIHAPUS dari daftar;
+ * claude-opus-5-5 (koreksi Manuel): asteria naik ke Pro, dua model Claude = Max;
+ * claude-fable-5-1 ditambahkan ke Max. Keduanya sudah ada di 9router.
+ * Paket efektif = langganan aktif, kalau tidak ada -> paket bawaan akun.
  */
 export type Plan = "free" | "pro" | "max";
 
@@ -39,25 +42,23 @@ export const MODEL_LABELS: Record<string, string> = {
   "onheil-1.1-luna": "Onheil 1.1 Luna",
   "onheil-1.1-aria": "Onheil 1.1 Aria",
   "onheil-1.5-selenia": "Onheil 1.5 Selenia",
-  "onheil-1.5-solaria": "Onheil 1.5 Solaria",
   "onheil-2-asteria": "Onheil 2 Asteria",
-  "onheil-2.5-celestia": "Onheil 2.5 Celestia",
-  "onheil-3-istaroth": "Onheil 3 Istaroth",
+  "claude-opus-5-5": "Claude Opus 5.5",
+  "claude-fable-5-1": "Claude Fable 5.1",
 };
 
 const RANK: Record<Plan, number> = { free: 0, pro: 1, max: 2 };
 
 export const PLAN_MODELS: Record<Plan, string[]> = {
   free: ["onheil-1.1-luna", "onheil-1.1-aria"],
-  pro: ["onheil-1.1-luna", "onheil-1.1-aria", "onheil-1.5-selenia", "onheil-1.5-solaria"],
+  pro: ["onheil-1.1-luna", "onheil-1.1-aria", "onheil-1.5-selenia", "onheil-2-asteria"],
   max: [
     "onheil-1.1-luna",
     "onheil-1.1-aria",
     "onheil-1.5-selenia",
-    "onheil-1.5-solaria",
     "onheil-2-asteria",
-    "onheil-2.5-celestia",
-    "onheil-3-istaroth",
+    "claude-opus-5-5",
+    "claude-fable-5-1",
   ],
 };
 
@@ -102,8 +103,7 @@ export const MODEL_BADGE: Record<string, string> = {
   "onheil-1.1-luna": "",
   "onheil-1.1-aria": "",
   "onheil-1.5-selenia": "Pro",
-  "onheil-1.5-solaria": "Pro",
-  "onheil-2-asteria": "Max",
-  "onheil-2.5-celestia": "Max",
-  "onheil-3-istaroth": "Max",
+  "onheil-2-asteria": "Pro",
+  "claude-opus-5-5": "Max",
+  "claude-fable-5-1": "Max",
 };

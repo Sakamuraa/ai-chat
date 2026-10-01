@@ -1,74 +1,130 @@
-// language: TypeScript, file: lib/quota.test.ts, target: vitest — aturan kuota token
+// language: TypeScript, file: lib/quota.test.ts, target: tes aturan kuota ala Claude (5 jam + mingguan)
 import { describe, it, expect } from "vitest";
-import { checkQuota, dailyTokenLimit, estimateTokens, remainingToday, type QuotaState } from "./quota";
+import {
+  checkQuota,
+  estimateTokens,
+  fiveHourPeriod,
+  fiveHourTokenLimit,
+  remainingWindows,
+  weeklyPeriod,
+  weeklyTokenLimit,
+  FIVE_HOUR_MS,
+  type QuotaState,
+} from "./quota";
 
-const base = (over: Partial<QuotaState> = {}): QuotaState => ({
-  dailyUsed: 0,
-  dailyLimit: 10_000_000,
-  sub: null,
-  ...over,
-});
+const NOW = new Date("2026-09-30T10:00:00Z"); // Rabu
 
-const NOW = new Date("2026-09-24T12:00:00Z");
+function base(over: Partial<QuotaState> = {}): QuotaState {
+  return {
+    fiveHourUsed: 0,
+    fiveHourLimit: fiveHourTokenLimit(),
+    weeklyUsed: 0,
+    weeklyLimit: weeklyTokenLimit(),
+    sub: null,
+    ...over,
+  };
+}
 
-describe("checkQuota", () => {
-  it("tanpa langganan: jalan selama belum menyentuh batas harian", () => {
-    expect(checkQuota(base({ dailyUsed: 9_999_999 }), NOW)).toEqual({ ok: true, kind: "daily" });
-    expect(checkQuota(base({ dailyUsed: 10_000_000 }), NOW)).toEqual({ ok: false, kind: "daily_exceeded" });
+describe("checkQuota (tanpa langganan)", () => {
+  it("jendela 5 jam: lolos di bawah limit, mentok di limit", () => {
+    expect(checkQuota(base({ fiveHourUsed: 999_999 }), NOW)).toEqual({ ok: true, kind: "window" });
+    expect(checkQuota(base({ fiveHourUsed: 1_000_000 }), NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
   });
 
-  it("langganan unlimited menembus batas harian sampai kadaluarsa", () => {
+  it("mingguan: lolos di bawah limit, mentok di limit", () => {
+    expect(checkQuota(base({ weeklyUsed: 6_999_999 }), NOW)).toEqual({ ok: true, kind: "window" });
+    expect(checkQuota(base({ weeklyUsed: 7_000_000 }), NOW)).toEqual({ ok: false, kind: "weekly_exceeded" });
+  });
+
+  it("jendela 5 jam dicek lebih dulu — dua-duanya penuh -> lima jam", () => {
+    const st = base({ fiveHourUsed: 1_000_000, weeklyUsed: 7_000_000 });
+    expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
+  });
+
+  it("jendela 5 jam penuh tapi mingguan masih ada -> tetap ditolak (5 jam menang)", () => {
+    const st = base({ fiveHourUsed: 1_000_000, weeklyUsed: 0 });
+    expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
+  });
+});
+
+describe("checkQuota (dengan langganan)", () => {
+  it("langganan unlimited menembus kedua jendela sampai kadaluarsa", () => {
     const st = base({
-      dailyUsed: 99_999_999,
+      fiveHourUsed: 99_999_999,
+      weeklyUsed: 99_999_999,
       sub: { tokenLimit: null, remaining: null, validUntil: "2026-12-31T00:00:00Z" },
     });
     expect(checkQuota(st, NOW)).toEqual({ ok: true, kind: "unlimited" });
   });
 
-  it("langganan berisi token: dicek sisa token, bukan batas harian", () => {
+  it("langganan berisi token: dicek sisa token, bukan jendela", () => {
     const st = base({
-      dailyUsed: 9_999_999,
-      sub: { tokenLimit: 10_000_000, remaining: 1234, validUntil: "2026-12-31T00:00:00Z" },
+      fiveHourUsed: 1_000_000,
+      sub: { tokenLimit: 5_000, remaining: 100, validUntil: "2026-12-31T00:00:00Z" },
     });
     expect(checkQuota(st, NOW)).toEqual({ ok: true, kind: "sub" });
-
-    const habis = base({
-      dailyUsed: 0,
-      sub: { tokenLimit: 10_000_000, remaining: 0, validUntil: "2026-12-31T00:00:00Z" },
-    });
-    expect(checkQuota(habis, NOW)).toEqual({ ok: false, kind: "sub_exhausted" });
   });
 
-  it("langganan kadaluarsa -> kembali ke batas harian", () => {
+  it("sisa langganan 0 -> sub_exhausted", () => {
     const st = base({
-      dailyUsed: 10_000_000,
-      sub: { tokenLimit: 1_000_000_000, remaining: 900_000_000, validUntil: "2026-09-24T11:59:59Z" },
+      sub: { tokenLimit: 5_000, remaining: 0, validUntil: "2026-12-31T00:00:00Z" },
     });
-    expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "daily_exceeded" });
+    expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "sub_exhausted" });
+  });
+
+  it("langganan kadaluarsa -> kembali ke aturan jendela", () => {
+    const st = base({
+      fiveHourUsed: 1_000_000,
+      sub: { tokenLimit: null, remaining: null, validUntil: "2026-01-01T00:00:00Z" },
+    });
+    expect(checkQuota(st, NOW)).toEqual({ ok: false, kind: "five_hour_exceeded" });
   });
 });
 
-describe("dailyTokenLimit", () => {
-  it("ikut paket Standard di lib/plans.ts (1 juta), env tidak berpengaruh", () => {
-    expect(dailyTokenLimit()).toBe(1_000_000);
-    process.env.DAILY_TOKEN_LIMIT = "5000000";
-    expect(dailyTokenLimit()).toBe(1_000_000); // env tak lagi jadi sumber angka
-    delete process.env.DAILY_TOKEN_LIMIT;
-    expect(dailyTokenLimit()).toBe(1_000_000);
+describe("period id", () => {
+  it("jendela 5 jam tetap anchored ke epoch: reset wal-clock tiap 5 jam", () => {
+    // snap ke awal bucket dulu — "2026-09-30T00:00:00Z" sendiri jatuh 4 jam
+    // setelah boundary epoch, jadi keliru kalau dipakai apa adanya.
+    const anchor = new Date("2026-09-30T00:00:00Z").getTime();
+    const t0 = new Date(Math.floor(anchor / FIVE_HOUR_MS) * FIVE_HOUR_MS);
+    const t1 = new Date(t0.getTime() + FIVE_HOUR_MS - 1);
+    const t2 = new Date(t0.getTime() + FIVE_HOUR_MS);
+    expect(fiveHourPeriod(t0)).toBe(fiveHourPeriod(t1));
+    expect(fiveHourPeriod(t0)).not.toBe(fiveHourPeriod(t2));
+  });
+
+  it("mingguan = tanggal Senin UTC; Rabu & Minggu minggu yang sama, Senin pindah", () => {
+    const rabu = new Date("2026-09-30T10:00:00Z"); // Rabu
+    const minggu = new Date("2026-10-04T23:59:00Z"); // Minggu
+    const senin = new Date("2026-10-05T00:00:00Z"); // Senin
+    expect(weeklyPeriod(rabu)).toBe("2026-09-28"); // Senin sebelum Rabu
+    expect(weeklyPeriod(minggu)).toBe("2026-09-28");
+    expect(weeklyPeriod(senin)).toBe("2026-10-05");
   });
 });
 
-describe("estimateTokens / remainingToday", () => {
+describe("limit", () => {
+  it("limit jendela 5 jam = 1 juta; mingguan = 7 juta (sumber: lib/plans.ts)", () => {
+    expect(fiveHourTokenLimit()).toBe(1_000_000);
+    expect(weeklyTokenLimit()).toBe(7_000_000);
+  });
+});
+
+describe("estimateTokens / remainingWindows", () => {
   it("perkiraan ~4 char per token, minimal 1", () => {
     expect(estimateTokens("")).toBe(1);
-    expect(estimateTokens("x".repeat(400))).toBe(100);
+    expect(estimateTokens("abcd")).toBe(1);
+    expect(estimateTokens("a".repeat(40))).toBe(10);
   });
 
-  it("sisa hari ini mengikuti aturan aktif", () => {
-    expect(remainingToday(base({ dailyUsed: 4_000_000 }))).toBe(6_000_000);
-    expect(remainingToday(base({ dailyUsed: 10_000_000 }))).toBe(0);
+  it("sisa jendela = limit - used; penuh = 0; unlimited = Infinity", () => {
+    expect(remainingWindows(base({ fiveHourUsed: 400_000, weeklyUsed: 1_000_000 }))).toEqual({
+      fiveHour: 600_000,
+      weekly: 6_000_000,
+    });
+    expect(remainingWindows(base({ fiveHourUsed: 1_000_000 })).fiveHour).toBe(0);
     expect(
-      remainingToday(base({ sub: { tokenLimit: null, remaining: null, validUntil: "2026-12-31T00:00:00Z" } })),
-    ).toBe(Infinity);
+      remainingWindows(base({ sub: { tokenLimit: null, remaining: null, validUntil: "2026-12-31T00:00:00Z" } })),
+    ).toEqual({ fiveHour: Infinity, weekly: Infinity });
   });
 });

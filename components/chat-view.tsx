@@ -285,7 +285,13 @@ async function pickFiles(list: FileList | null) {
         const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string; kind?: string };
         if (body.error === "rate_limited") setError(t("chat.rateLimited"));
         else if (body.error === "quota_exceeded")
-          setError(body.kind === "sub_exhausted" ? t("chat.quotaSub") : t("chat.quotaDaily", { n: "10.000.000" }));
+          setError(
+            body.kind === "sub_exhausted"
+              ? t("chat.quotaSub")
+              : body.kind === "weekly_exceeded"
+                ? t("chat.quotaWeekly")
+                : t("chat.quotaWindow5h"),
+          );
         else if (body.error === "plan_model_forbidden") setError(t("chat.planForbidden"));
         else setError(body.detail ? `${body.detail}` : `Error ${res.status}`);
         return "";

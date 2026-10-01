@@ -202,7 +202,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "plan_model_forbidden", plan: st0.plan }, { status: 403 });
   }
 
-  // kuota token: batas harian (default 10 juta/24 jam) atau langganan aktif
+  // kuota token ala Claude: jendela 5 jam + mingguan, atau langganan aktif
   const quota = checkQuota(st0);
   if (!quota.ok) {
     return NextResponse.json({ error: "quota_exceeded", kind: quota.kind }, { status: 429 });

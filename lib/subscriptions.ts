@@ -1,7 +1,13 @@
 // language: TypeScript, file: lib/subscriptions.ts, target: Vercel Node runtime — kuota + kode langganan
 import { randomBytes } from "node:crypto";
 import { db } from "./db";
-import { dailyTokenLimit, type QuotaState } from "./quota";
+import {
+  fiveHourPeriod,
+  fiveHourTokenLimit,
+  weeklyPeriod,
+  weeklyTokenLimit,
+  type QuotaState,
+} from "./quota";
 import { allowedModels, effectivePlan, planTokenLimit, type Plan } from "./plans";
 
 export { DURATION_OPTIONS } from "./sub-options";
@@ -28,14 +34,25 @@ export type CodeRow = {
   expired?: boolean;
 };
 
-/** Ambil status kuota user: pemakaian hari ini (UTC) + langganan aktif terbaru. */
+/** Ambil status kuota user: dua jendela (5 jam + mingguan) + langganan aktif terbaru. */
 export type QuotaStateEx = QuotaState & { plan: Plan; models: string[] };
 
 export async function quotaState(userId: string): Promise<QuotaStateEx> {
-  const usage = (await db()`
-    SELECT COALESCE(tokens, 0)::bigint AS tokens
-    FROM token_usage WHERE user_id = ${userId} AND day = (now() AT TIME ZONE 'utc')::date
-  `) as unknown as { tokens: number | string }[];
+  const now = new Date();
+  const rows = await Promise.all([
+    db()`
+      SELECT COALESCE(tokens, 0)::bigint AS tokens
+      FROM quota_windows
+      WHERE user_id = ${userId} AND kind = '5h' AND period = ${fiveHourPeriod(now)}
+    `,
+    db()`
+      SELECT COALESCE(tokens, 0)::bigint AS tokens
+      FROM quota_windows
+      WHERE user_id = ${userId} AND kind = 'week' AND period = ${weeklyPeriod(now)}
+    `,
+  ]);
+  const h = rows[0] as unknown as { tokens: number | string }[];
+  const w = rows[1] as unknown as { tokens: number | string }[];
 
   const acct = (await db()`
     SELECT plan::text AS plan FROM users WHERE id = ${userId}
@@ -51,8 +68,10 @@ export async function quotaState(userId: string): Promise<QuotaStateEx> {
 
   const plan = effectivePlan(acct[0]?.plan, sub[0]?.plan, sub[0]?.valid_until);
   return {
-    dailyUsed: Number(usage[0]?.tokens ?? 0),
-    dailyLimit: dailyTokenLimit(),
+    fiveHourUsed: Number(h[0]?.tokens ?? 0),
+    fiveHourLimit: fiveHourTokenLimit(),
+    weeklyUsed: Number(w[0]?.tokens ?? 0),
+    weeklyLimit: weeklyTokenLimit(),
     plan,
     models: allowedModels(plan),
     sub: sub[0]
@@ -65,14 +84,26 @@ export async function quotaState(userId: string): Promise<QuotaStateEx> {
   };
 }
 
-/** Catat pemakaian token hari ini + menyusutkan sisa langganan (kalau berbasis token). */
+/** Catat pemakaian token ke dua jendela (dasar cek kuota), riwayat harian
+ *  (token_usage, untuk laporan), dan menyusutkan sisa langganan (kalau berbasis token). */
 export async function addUsage(userId: string, tokens: number): Promise<void> {
   if (!Number.isFinite(tokens) || tokens <= 0) return;
   const n = Math.round(tokens);
+  const now = new Date();
   await db()`
     INSERT INTO token_usage (user_id, day, tokens)
     VALUES (${userId}, (now() AT TIME ZONE 'utc')::date, ${n})
     ON CONFLICT (user_id, day) DO UPDATE SET tokens = token_usage.tokens + ${n}
+  `;
+  await db()`
+    INSERT INTO quota_windows (user_id, kind, period, tokens)
+    VALUES (${userId}, '5h', ${fiveHourPeriod(now)}, ${n})
+    ON CONFLICT (user_id, kind, period) DO UPDATE SET tokens = quota_windows.tokens + ${n}
+  `;
+  await db()`
+    INSERT INTO quota_windows (user_id, kind, period, tokens)
+    VALUES (${userId}, 'week', ${weeklyPeriod(now)}, ${n})
+    ON CONFLICT (user_id, kind, period) DO UPDATE SET tokens = quota_windows.tokens + ${n}
   `;
   await db()`
     UPDATE user_subs SET remaining = GREATEST(0, remaining - ${n})
