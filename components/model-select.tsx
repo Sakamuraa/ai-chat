@@ -156,7 +156,7 @@ export default function ModelSelect({
                 </span>
                 {locked ? <LockSimple size={14} className="shrink-0" /> : null}
                 {active && !locked ? (
-                  <Check size={15} weight="bold" className="shrink-0 text-[#a16207] dark:text-[var(--accent)]" />
+                  <Check size={15} weight="bold" className="shrink-0 text-[var(--accent)]" />
                 ) : null}
               </button>
             );

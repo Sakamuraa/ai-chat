@@ -1,49 +1,55 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* ── TOKEN ────────────────────────────────────────────────────
-   SKALA RADIUS (satu sistem, jangan dicampur):
-     kartu / panel / input / bubble user = 12px  (--r)
-     chip / tombol aksi / send           = pill   (999px)
-     mark brand                          = 10px
-     code inline                         = 6px
-   CATATAN: root html harus tetap 16px supaya rem akurat (rounded-xl = 12px persis).
-   SATU aksen: #facc15, teks di atasnya selalu #18181b (kontras 12.9:1).
-   Netral: zinc family (dingin), jangan digabung abu hangat. */
+/* ── TOKEN: PALET GOOGLE (gaya Gemini) ────────────────────────
+   Redesign 2026-10-01 (branch preview): mengikuti referensi gemini.google.
+   Light : sidebar #f0f4f9 (Google Cloud grey), kanvas putih, Google blue 600.
+   Dark  : kanvas near-black #131314, Google blue light #8ab4f8.
+   Netral = abu Google (grey 300/400/600/900) — JANGAN digabung zinc/amber.
+   SKALA RADIUS:
+     composer chat        = 28px  (rounded-[28px], khas Gemini)
+     bubble user / kartu  = 24px / var(--r)=16px
+     chip / tombol aksi   = pill (999px)
+     code inline          = 6px
+   SATU aksen: blue. Teks di atas accent terisi: putih (light) / navy (dark). */
 
 :root {
-  --bg: #fafafa;
+  --bg: #ffffff;
   --panel: #ffffff;
-  --sidebar: #f4f4f5;
-  --border: #e4e4e7;
-  --border-strong: #d4d4d8;
-  --fg: #18181b;
-  --muted: #71717a;
-  --faint: #a1a1aa;
-  --accent: #facc15;
-  --accent-fg: #18181b;
-  --accent-soft: rgba(250, 204, 21, 0.14);
-  --ring: rgba(250, 204, 21, 0.75);
-  --danger: #dc2626;
-  --r: 12px;
-  --code-bg: #101013;
+  --sidebar: #f0f4f9;
+  --border: #dadce0;
+  --border-strong: #c4c7cc;
+  --fg: #1f1f1f;
+  --muted: #5f6368;
+  --faint: #80868b;
+  --accent: #1a73e8;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(26, 115, 232, 0.1);
+  --ring: rgba(26, 115, 232, 0.65);
+  --danger: #d93025;
+  --r: 16px;
+  --code-bg: #f8f9fa;
 }
 
 .dark {
-  --bg: #131316;
-  --panel: #1b1b1f;
-  --sidebar: #0e0e10;
-  --border: #27272b;
-  --border-strong: #3a3a40;
-  --fg: #ededf0;
-  --muted: #a1a1aa;
-  --faint: #71717a;
-  --accent-soft: rgba(250, 204, 21, 0.16);
-  --code-bg: #0b0b0d;
+  --bg: #131314;
+  --panel: #1e1f22;
+  --sidebar: #1b1b1e;
+  --border: #2d2e31;
+  --border-strong: #3c3e42;
+  --fg: #e3e3e8;
+  --muted: #9aa0a6;
+  --faint: #70757a;
+  --accent: #8ab4f8;
+  --accent-fg: #062e6f;
+  --accent-soft: rgba(138, 180, 248, 0.14);
+  --ring: rgba(138, 180, 248, 0.75);
+  --danger: #f28b82;
+  --code-bg: #0e0f11;
 }
 
 html,
@@ -63,7 +69,6 @@ body {
   background: var(--accent);
   color: var(--accent-fg);
 }
-
 *:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -164,13 +169,10 @@ body {
   color: var(--faint);
 }
 .md a {
-  color: #a16207;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
-}
-.dark .md a {
-  color: var(--accent);
 }
 .md code {
   font-family: var(--font-mono);

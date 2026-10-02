@@ -554,7 +554,7 @@ async function pickFiles(list: FileList | null) {
           <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-5 py-10 sm:px-8">
             <div className="fade-up">
               <BrandMark size={30} />
-              <h2 className="mt-5 text-[24px] font-semibold tracking-tight sm:text-[30px]">
+              <h2 className="mt-5 bg-gradient-to-r from-[#4285f4] via-[#9b72cb] to-[#d96570] bg-clip-text text-[24px] font-semibold tracking-tight text-transparent sm:text-[30px]">
                 {t("chat.emptyTitle")}
               </h2>
               <p className="mt-2 max-w-[46ch] text-[15px] text-[var(--muted)]">{t("chat.emptySub")}</p>
@@ -566,7 +566,7 @@ async function pickFiles(list: FileList | null) {
               <div key={m.id ?? i} className="mb-7 group/msg">
                 {m.role === "user" ? (
                   <div className="flex flex-col items-end">
-                    <div className="max-w-[86%] rounded-xl border border-[color-mix(in_srgb,var(--accent)_38%,transparent)] bg-[var(--accent-soft)] px-4 py-2.5 text-[15px]">
+                    <div className="max-w-[86%] rounded-3xl border border-[var(--border)] bg-[var(--sidebar)] px-4 py-2.5 text-[15px]">
                       {editingIdx === i ? (
                         <textarea
                           autoFocus
@@ -811,7 +811,7 @@ async function pickFiles(list: FileList | null) {
 
       {readOnly ? null : (
         <div className="border-t border-[var(--border)] bg-[var(--bg)] px-5 pb-5 pt-4">
-          <div className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus-within:border-[var(--border-strong)] focus-within:shadow-[0_2px_10px_rgba(0,0,0,0.06)]">
+          <div className="mx-auto w-full max-w-3xl rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_6px_18px_rgba(0,0,0,0.05)] transition focus-within:border-[var(--border-strong)] focus-within:shadow-[0_2px_6px_rgba(0,0,0,0.10),0_10px_28px_rgba(0,0,0,0.08)]">
             {attachments.length > 0 ? (
               <div className="mb-2 px-1">
                 <AttachmentPreview attachments={attachments} compact />

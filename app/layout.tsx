@@ -1,15 +1,16 @@
 // language: TypeScript, file: app/layout.tsx, target: Next.js App Router
 // Font lewat next/font (self-host, no <link> Google Fonts di produksi).
+// Redesign 2026-10-01: Roboto — kesan Google/Gemini (Google Sans tak berlisensi bebas).
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Roboto, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppChrome from "@/components/app-chrome";
 import Sidebar from "@/components/sidebar";
 import WelcomeModal from "@/components/welcome-modal";
 
-const sans = Geist({
+const sans = Roboto({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-roboto",
   display: "swap",
 });
 
@@ -29,8 +30,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
-    { media: "(prefers-color-scheme: dark)", color: "#131316" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#131314" },
   ],
 };
 
