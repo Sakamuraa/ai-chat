@@ -110,6 +110,29 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  /** tekan-tahan bubble user (mobile) -> popup Edit/Copy ala ChatGPT */
+  const [holdMsg, setHoldMsg] = useState<{ i: number; x: number; y: number } | null>(null);
+  const msgHold = useRef<{ t: number | null; x: number; y: number }>({ t: null, x: 0, y: 0 });
+  const cancelMsgHold = () => {
+    if (msgHold.current.t) window.clearTimeout(msgHold.current.t);
+    msgHold.current.t = null;
+  };
+  const startMsgHold = (i: number, e: React.PointerEvent) => {
+    if (editingIdx !== null || readOnly) return;
+    cancelMsgHold();
+    msgHold.current.x = e.clientX;
+    msgHold.current.y = e.clientY;
+    msgHold.current.t = window.setTimeout(() => {
+      msgHold.current.t = null;
+      setHoldMsg({ i, x: e.clientX, y: e.clientY });
+    }, 500); // 500ms tahan jari; lepas lebih cepat = klik biasa
+  };
+  const moveMsgHold = (e: React.PointerEvent) => {
+    if (msgHold.current.t === null) return;
+    if (Math.abs(e.clientX - msgHold.current.x) > 12 || Math.abs(e.clientY - msgHold.current.y) > 12) {
+      cancelMsgHold(); // jari bergeser = scroll, bukan hold
+    }
+  };
   const [shareOn, setShareOn] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
 
@@ -619,7 +642,19 @@ async function pickFiles(list: FileList | null) {
               <div key={m.id ?? i} className="mb-7 group/msg">
                 {m.role === "user" ? (
                   <div className="flex flex-col items-end">
-                    <div className="max-w-[86%] rounded-3xl border border-[var(--border)] bg-[var(--sidebar)] px-4 py-2.5 text-[15px]">
+                    <div
+                      onPointerDown={(e) => startMsgHold(i, e)}
+                      onPointerUp={cancelMsgHold}
+                      onPointerLeave={cancelMsgHold}
+                      onPointerMove={moveMsgHold}
+                      onPointerCancel={cancelMsgHold}
+                      onContextMenu={(e) => {
+                        if (readOnly || editingIdx !== null) return;
+                        e.preventDefault();
+                        setHoldMsg({ i, x: e.clientX, y: e.clientY });
+                      }}
+                      className="max-w-[86%] rounded-3xl border border-[var(--border)] bg-[var(--sidebar)] px-4 py-2.5 text-[15px] [touch-action:manipulation]"
+                    >
                       {editingIdx === i ? (
                         <textarea
                           autoFocus
@@ -791,6 +826,57 @@ async function pickFiles(list: FileList | null) {
                   <i />
                 </span>
               </div>
+            ) : null}
+
+            {/* popup tekan-tahan bubble user: Edit & Copy (mobile-friendly) */}
+            {holdMsg ? (
+              <>
+                <div
+                  className="fixed inset-0 z-[130]"
+                  onClick={() => setHoldMsg(null)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setHoldMsg(null);
+                  }}
+                />
+                <div
+                  role="menu"
+                  className="fade-up fixed z-[140] w-[170px] rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)]"
+                  style={{
+                    left: `clamp(8px, ${holdMsg.x}px, calc(100vw - 184px))`,
+                    top: `clamp(8px, ${holdMsg.y}px, calc(100vh - 116px))`,
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      const m = messages[holdMsg.i];
+                      if (m?.id) {
+                        setEditingIdx(holdMsg.i);
+                        setEditDraft(m.content);
+                      }
+                      setHoldMsg(null);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-[var(--fg)] transition hover:bg-[var(--border)]/60"
+                  >
+                    <PencilSimple size={15} className="text-[var(--muted)]" />
+                    {t("chat.edit")}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const m = messages[holdMsg.i];
+                      if (m) {
+                        void navigator.clipboard.writeText(m.content);
+                        window.dispatchEvent(new CustomEvent("toast", { detail: t("chat.copied") }));
+                      }
+                      setHoldMsg(null);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-[var(--fg)] transition hover:bg-[var(--border)]/60"
+                  >
+                    <Copy size={15} className="text-[var(--muted)]" />
+                    {t("chat.copy")}
+                  </button>
+                </div>
+              </>
             ) : null}
 
             {error ? (

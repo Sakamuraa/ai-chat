@@ -86,6 +86,8 @@ export default function Sidebar() {
   // tekan-tahan sesi (mobile) -> modal opsi
   const [held, setHeld] = useState<Session | null>(null);
   const holdTimer = useRef<number | null>(null);
+  /** konfirmasi hapus sesi — dialog sendiri, bukan confirm() bawaan browser */
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
   // mobile: mulai tertutup
   useEffect(() => {
@@ -156,7 +158,6 @@ export default function Sidebar() {
   }
 
   async function remove(id: string) {
-    if (!confirm(t("nav.deleteTitle"))) return;
     await fetch(`/api/sessions/${id}`, { method: "DELETE" });
     setSessions((prev) => prev.filter((s) => s.id !== id));
     if (id === activeId) {
@@ -343,7 +344,7 @@ export default function Sidebar() {
                       <PencilSimple size={14} />
                     </button>
                     <button
-                      onClick={() => remove(s.id)}
+                      onClick={() => setConfirmDel(s.id)}
                       title={t("nav.deleteTitle")}
                       aria-label={t("nav.deleteTitle")}
                       className="rounded-full p-1 text-[var(--faint)] opacity-0 transition hover:bg-[var(--panel)] hover:text-[var(--danger)] focus-visible:opacity-100 group-hover:opacity-100"
@@ -432,7 +433,7 @@ export default function Sidebar() {
           <button
             onClick={() => {
               setHeld(null);
-              remove(held.id);
+              setConfirmDel(held.id);
             }}
             className="rounded-full border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] px-4 py-2.5 text-sm font-medium text-[var(--danger)] transition"
           >
@@ -443,6 +444,43 @@ export default function Sidebar() {
             className="rounded-full border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--muted)] transition"
           >
             {t("chat.cancel")}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // konfirmasi hapus — dialog sendiri (bukan confirm() bawaan browser)
+  const confirmDialog = confirmDel ? (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("nav.deleteTitle")}
+      onClick={() => setConfirmDel(null)}
+    >
+      <div className="absolute inset-0 bg-black/55" />
+      <div
+        className="fade-up relative z-10 w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.45)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-sm font-medium leading-relaxed">{t("nav.deleteTitle")}</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={() => setConfirmDel(null)}
+            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:text-[var(--fg)]"
+          >
+            {t("chat.cancel")}
+          </button>
+          <button
+            onClick={() => {
+              const id = confirmDel;
+              setConfirmDel(null);
+              void remove(id);
+            }}
+            className="rounded-full border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] px-4 py-2 text-sm font-semibold text-[var(--danger)] transition active:scale-[0.98]"
+          >
+            {t("session.delete")}
           </button>
         </div>
       </div>
@@ -502,6 +540,7 @@ export default function Sidebar() {
         </div>
       </div>
       {sessionMenu}
+      {confirmDialog}
       <AccountModal
         open={accountOpen}
         onClose={() => setAccountOpen(false)}
