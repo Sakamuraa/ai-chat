@@ -111,7 +111,7 @@ export default function DocsPage() {
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                     plan === "max"
-                      ? "border-[color-mix(in_srgb,var(--accent)_45%,transparent)] text-[var(--accent)]"
+                      ? "border-[color-mix(in_srgb,var(--accent)_45%,transparent)] text-[var(--accent-ink)]"
                       : "border-[var(--border)] text-[var(--muted)]"
                   }`}
                 >

@@ -554,7 +554,7 @@ async function pickFiles(list: FileList | null) {
           <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-5 py-10 sm:px-8">
             <div className="fade-up">
               <BrandMark size={30} />
-              <h2 className="mt-5 bg-gradient-to-r from-[#4285f4] via-[#9b72cb] to-[#d96570] bg-clip-text text-[24px] font-semibold tracking-tight text-transparent sm:text-[30px]">
+              <h2 className="brand-gradient mt-5 text-[24px] font-semibold tracking-tight sm:text-[30px]">
                 {t("chat.emptyTitle")}
               </h2>
               <p className="mt-2 max-w-[46ch] text-[15px] text-[var(--muted)]">{t("chat.emptySub")}</p>
@@ -714,7 +714,7 @@ async function pickFiles(list: FileList | null) {
                     />
                     <span
                       aria-hidden
-                      className={streaming ? "animate-pulse text-[var(--accent)]" : "text-[var(--accent)]"}
+                      className={streaming ? "animate-pulse text-[var(--accent-ink)]" : "text-[var(--accent-ink)]"}
                     >
                       ●
                     </span>
@@ -730,9 +730,9 @@ async function pickFiles(list: FileList | null) {
                           {st.status === "gagal" ? (
                             <X size={12} weight="bold" className="shrink-0 text-[var(--danger)]" />
                           ) : st.status === "selesai" ? (
-                            <Check size={12} weight="bold" className="shrink-0 text-[var(--accent)]" />
+                            <Check size={12} weight="bold" className="shrink-0 text-[var(--accent-ink)]" />
                           ) : (
-                            <CircleNotch size={12} className="shrink-0 animate-spin text-[var(--accent)]" />
+                            <CircleNotch size={12} className="shrink-0 animate-spin text-[var(--accent-ink)]" />
                           )}
                           <span
                             className={`truncate ${

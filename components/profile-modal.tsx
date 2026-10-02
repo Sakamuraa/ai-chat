@@ -672,7 +672,7 @@ export default function ProfileModal({
                       <span
                         className={`shrink-0 ${
                           state === "unused"
-                            ? "text-[var(--accent)]"
+                            ? "text-[var(--accent-ink)]"
                             : state === "expired" || state === "used"
                               ? "text-[var(--muted)]"
                               : "text-[var(--danger)]"

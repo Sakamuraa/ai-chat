@@ -135,7 +135,7 @@ export default function Landing({ username }: { username: string }) {
                 <BrandMark size={22} />
                 <span className="text-sm font-semibold tracking-tight">OnheilAI</span>
               </div>
-              <h1 className="text-[26px] font-semibold leading-[1.15] tracking-tight sm:text-[34px]">
+              <h1 className="brand-gradient text-[26px] font-semibold leading-[1.15] tracking-tight sm:text-[34px]">
                 {t("landing.greeting", { name })}
               </h1>
               <p className="mt-2.5 max-w-[52ch] text-[15px] text-[var(--muted)]">{t("landing.sub")}</p>

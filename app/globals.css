@@ -5,11 +5,14 @@
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* ── TOKEN: PALET GOOGLE (gaya Gemini) ────────────────────────
+/* ── TOKEN: GAYA GEMINI + AKSEN FACC15 ─────────────────────────
    Redesign 2026-10-01 (branch preview): mengikuti referensi gemini.google.
-   Light : sidebar #f0f4f9 (Google Cloud grey), kanvas putih, Google blue 600.
-   Dark  : kanvas near-black #131314, Google blue light #8ab4f8.
-   Netral = abu Google (grey 300/400/600/900) — JANGAN digabung zinc/amber.
+   Light : sidebar #f0f4f9 (Google Cloud grey), kanvas putih.
+   Dark  : kanvas near-black #131314, surface #1e1f22.
+   AKSEN PUSAT = #facc15 (kuning) — permintaan Manuel 2026-10-02.
+   Teks di atas kuning SELALU #18181b (kontras 12.9:1); teks/link berwarna
+   di atas bg terang pakai --accent-ink (amber tua, kuning terang tak lolos AA).
+   Netral = abu Google (grey 300/400/600/900) — JANGAN digabung zinc.
    SKALA RADIUS:
      composer chat        = 28px  (rounded-[28px], khas Gemini)
      bubble user / kartu  = 24px / var(--r)=16px
@@ -26,13 +29,17 @@
   --fg: #1f1f1f;
   --muted: #5f6368;
   --faint: #80868b;
-  --accent: #1a73e8;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(26, 115, 232, 0.1);
-  --ring: rgba(26, 115, 232, 0.65);
+  --accent: #facc15;
+  --accent-fg: #18181b;
+  --accent-ink: #b45309;
+  --accent-soft: rgba(250, 204, 21, 0.16);
+  --ring: rgba(250, 204, 21, 0.75);
   --danger: #d93025;
   --r: 16px;
   --code-bg: #f8f9fa;
+  --g1: #854d0e;
+  --g2: #a16207;
+  --g3: #ca8a04;
 }
 
 .dark {
@@ -44,12 +51,16 @@
   --fg: #e3e3e8;
   --muted: #9aa0a6;
   --faint: #70757a;
-  --accent: #8ab4f8;
-  --accent-fg: #062e6f;
-  --accent-soft: rgba(138, 180, 248, 0.14);
-  --ring: rgba(138, 180, 248, 0.75);
+  --accent: #facc15;
+  --accent-fg: #18181b;
+  --accent-ink: #facc15;
+  --accent-soft: rgba(250, 204, 21, 0.14);
+  --ring: rgba(250, 204, 21, 0.75);
   --danger: #f28b82;
   --code-bg: #0e0f11;
+  --g1: #fde047;
+  --g2: #facc15;
+  --g3: #f59e0b;
 }
 
 html,
@@ -90,7 +101,14 @@ body {
 
 /* ── MOTION (MOTION_INTENSITY 4: transisi state, bukan hiburan) ────── */
 .fade-up {
-  animation: fade-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fade-up 0.32s cubic-bezier(0.2, 0, 0, 1) both; /* M3 emphasized easing */
+}
+/* Greeting ala Gemini — gradient keluarga FACC15, clip ke teks */
+.brand-gradient {
+  background-image: linear-gradient(90deg, var(--g1), var(--g2), var(--g3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 @keyframes fade-up {
   from {
@@ -169,7 +187,7 @@ body {
   color: var(--faint);
 }
 .md a {
-  color: var(--accent);
+  color: var(--accent-ink);
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;

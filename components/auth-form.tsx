@@ -496,7 +496,7 @@ export default function AuthForm({ mode, switching = false }: { mode: "login" | 
                   {t("auth.noAccount")}{" "}
                   <Link
                     href="/register"
-                    className="font-medium text-[var(--accent)] underline underline-offset-4"
+                    className="font-medium text-[var(--accent-ink)] underline underline-offset-4"
                   >
                     {t("auth.register")}
                   </Link>
@@ -506,7 +506,7 @@ export default function AuthForm({ mode, switching = false }: { mode: "login" | 
                   {t("auth.haveAccount")}{" "}
                   <Link
                     href="/login"
-                    className="font-medium text-[var(--accent)] underline underline-offset-4"
+                    className="font-medium text-[var(--accent-ink)] underline underline-offset-4"
                   >
                     {t("auth.login")}
                   </Link>
