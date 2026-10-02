@@ -68,6 +68,11 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
+  // teks model SEBELUM tool pertama = "kalimat pembuka". Kartu tool dirender di
+  // TENGAH-nya (pembuka -> kartu tool -> hasil), persis urutan chat claude.ai.
+  const [preToolText, setPreToolText] = useState("");
+  const preToolRef = useRef(false);
+  const splitRef = useRef(0);
   // langkah tool realtime (gaya Claude.ai): ringkasan hitungan + daftar langkah terbuka
   const [toolSteps, setToolSteps] = useState<{ name?: string; label: string; status: string }[]>([]);
   const [stepsOpen, setStepsOpen] = useState(true);
@@ -261,7 +266,12 @@ async function pickFiles(list: FileList | null) {
     resumeRef.current = false;
     setStreaming(true);
     setStreamText("");
-    if (!opts.keepPanel) setToolSteps([]);
+    splitRef.current = 0;
+    if (!opts.keepPanel) {
+      setToolSteps([]);
+      setPreToolText("");
+      preToolRef.current = false;
+    }
     setAckPhase(0);
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     ackTimerRef.current = setTimeout(() => setAckPhase(1), 2200);
@@ -317,6 +327,14 @@ async function pickFiles(list: FileList | null) {
             evt = "";
             try {
               const step = JSON.parse(payload2) as { name?: string; label: string; status: string };
+              // tool pertama: teks yang sudah mengalir = kalimat pembuka.
+              // Bekukan terpisah supaya kartu tool tampil di antara pembuka & hasil.
+              if (!preToolRef.current && splitRef.current === 0 && acc.length > 0) {
+                splitRef.current = acc.length;
+                preToolRef.current = true;
+                setPreToolText(acc);
+                setStreamText("");
+              }
               setToolSteps((prev) => {
                 const idx = prev.map((x) => x.label).lastIndexOf(step.label);
                 if (idx >= 0) {
@@ -344,7 +362,7 @@ async function pickFiles(list: FileList | null) {
             const piece = obj.choices?.[0]?.delta?.content;
             if (typeof piece === "string") {
               acc += piece;
-              setStreamText(acc);
+              setStreamText(splitRef.current > 0 ? acc.slice(splitRef.current) : acc);
             }
           } catch {
             /* potongan tidak utuh */
@@ -443,6 +461,9 @@ async function pickFiles(list: FileList | null) {
       acc = acc ? (part ? `${acc}\n\n${part}` : acc) : part;
     }
     if (acc) setMessages((prev) => [...prev, { role: "assistant", content: acc }]);
+    // teks pre-tool sudah termuat di messages — jangan tampil dua kali
+    setPreToolText("");
+    preToolRef.current = false;
 
     if (id === "new") {
       router.replace(`/c/${sid}`);
@@ -690,6 +711,30 @@ async function pickFiles(list: FileList | null) {
               </div>
             ))}
 
+            {/* urutan ala claude.ai: kalimat pembuka -> kartu tool -> hasil */}
+            {streaming && !streamText && !preToolText && ackPhase === 0 ? (
+              <div className="mb-7 flex items-start gap-3.5">
+                <span className="mt-0.5 hidden shrink-0 sm:block">
+                  <BrandMark size={24} />
+                </span>
+                <div className="min-w-0 flex-1 pt-1">
+                  <p className="fade-up text-[15px] text-[var(--fg)]">
+                    {t("chat.ack")}
+                    <span className="caret" aria-hidden />
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {preToolText ? (
+              <div className="mb-7 flex gap-3.5">
+                <span className="mt-0.5 hidden shrink-0 sm:block">
+                  <BrandMark size={24} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Markdown>{preToolText}</Markdown>
+                </div>
+              </div>
+            ) : null}
             {toolSteps.length > 0 ? (() => {
               // hitungan gaya Claude.ai: "Menjalankan 4 perintah, membaca 2 berkas, …"
               const c = { run: 0, read: 0, search: 0, make: 0, other: 0 };
@@ -759,20 +804,6 @@ async function pickFiles(list: FileList | null) {
                 </div>
               );
             })() : null}
-
-            {streaming && !streamText && ackPhase === 0 ? (
-              <div className="mb-7 flex items-start gap-3.5">
-                <span className="mt-0.5 hidden shrink-0 sm:block">
-                  <BrandMark size={24} />
-                </span>
-                <div className="min-w-0 flex-1 pt-1">
-                  <p className="fade-up text-[15px] text-[var(--fg)]">
-                    {t("chat.ack")}
-                    <span className="caret" aria-hidden />
-                  </p>
-                </div>
-              </div>
-            ) : null}
 
             {streaming && !streamText && ackPhase === 1 ? (
               <div className="mb-7 flex items-center gap-2">
