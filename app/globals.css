@@ -18,7 +18,7 @@
      bubble user / kartu  = 24px / var(--r)=16px
      chip / tombol aksi   = pill (999px)
      code inline          = 6px
-   SATU aksen: blue. Teks di atas accent terisi: putih (light) / navy (dark). */
+   SATU aksen: FACC15 (kuning). Teks di atas accent terisi SELALU hitam #18181b. */
 
 :root {
   --bg: #ffffff;
@@ -248,6 +248,30 @@ body {
 @keyframes shimmer {
   0% { transform: translateX(-120%); }
   100% { transform: translateX(320%); }
+}
+
+/* Tiga titik "berpikir / mencari / mengambil" ala Gemini — pantul berurutan */
+.tdots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tdots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.3;
+  animation: tdot 1.3s ease-in-out infinite;
+}
+.tdots i:nth-child(2) { animation-delay: 0.17s; }
+.tdots i:nth-child(3) { animation-delay: 0.34s; }
+@keyframes tdot {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tdots i { animation: none; }
 }
 
 /* Ruang header chat: mobile selalu beri jarak ke ikon sidebar (fixed left-3);

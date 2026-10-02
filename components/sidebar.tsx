@@ -226,7 +226,7 @@ export default function Sidebar() {
             <Link
               href="/"
               onClick={closeOnMobile}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98]"
             >
               <Plus size={16} weight="bold" />
               {t("nav.newChat")}
@@ -255,14 +255,14 @@ export default function Sidebar() {
           <Link
             href="/login"
             onClick={closeOnMobile}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98]"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-fg)] transition hover:brightness-95 active:scale-[0.98]"
           >
             {t("nav.login")}
           </Link>
           <Link
             href="/register"
             onClick={closeOnMobile}
-            className="mt-2 block w-full rounded-full border border-[var(--border)] px-4 py-2.5 text-center text-sm font-medium text-[var(--muted)] transition hover:text-[var(--fg)]"
+            className="mt-2 block w-full rounded-xl border border-[var(--border)] px-4 py-2.5 text-center text-sm font-medium text-[var(--muted)] transition hover:text-[var(--fg)]"
           >
             {t("nav.createAccount")}
           </Link>
@@ -315,7 +315,7 @@ export default function Sidebar() {
                       setDraft(s.title === "New chat" ? "" : s.title);
                     }}
                     className={`group mb-1 flex touch-none items-center gap-1 rounded-xl px-3 py-2 transition ${
-                      s.id === activeId ? "bg-[var(--border)]/70" : "hover:bg-[var(--border)]/45"
+                      s.id === activeId ? "bg-[var(--accent-soft)] font-medium" : "hover:bg-[var(--border)]/45"
                     }`}
                   >
                     <Link

@@ -503,7 +503,7 @@ async function pickFiles(list: FileList | null) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="chat-header flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-3 backdrop-blur-md sm:px-5">
+      <header className="chat-header relative flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-3 backdrop-blur-md sm:px-5">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium tracking-tight" title={displayTitle}>
             {displayTitle}
@@ -531,14 +531,27 @@ async function pickFiles(list: FileList | null) {
                 {shareOn ? t("chat.shareOn") : t("chat.share")}
               </button>
             ) : null}
-            <ModelSelect
-              value={currentModel}
-              onChange={persistModel}
-              lockedIds={lockedIds}
-              label={t("profile.model")}
-              direction="down"
-              models={options}
-            />
+            {/* mobile: tetap di alur kanan; desktop: di tengah header (ala Gemini) */}
+            <div className="sm:hidden">
+              <ModelSelect
+                value={currentModel}
+                onChange={persistModel}
+                lockedIds={lockedIds}
+                label={t("profile.model")}
+                direction="down"
+                models={options}
+              />
+            </div>
+            <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
+              <ModelSelect
+                value={currentModel}
+                onChange={persistModel}
+                lockedIds={lockedIds}
+                label={t("profile.model")}
+                direction="down"
+                models={options}
+              />
+            </div>
           </>
         )}
       </header>
@@ -712,13 +725,19 @@ async function pickFiles(list: FileList | null) {
                       size={12}
                       className={`shrink-0 transition-transform ${stepsOpen ? "rotate-90" : ""}`}
                     />
-                    <span
-                      aria-hidden
-                      className={streaming ? "animate-pulse text-[var(--accent-ink)]" : "text-[var(--accent-ink)]"}
-                    >
-                      ●
-                    </span>
+                    {streaming ? (
+                      <CircleNotch size={12} className="shrink-0 animate-spin text-[var(--accent-ink)]" />
+                    ) : (
+                      <span aria-hidden className="shrink-0 text-[var(--accent-ink)]">●</span>
+                    )}
                     <span className="truncate">{parts.join(", ")}</span>
+                    {streaming ? (
+                      <span aria-hidden className="tdots shrink-0 text-[var(--accent-ink)]">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    ) : null}
                     <span className="ml-auto shrink-0 text-[10px] tabular-nums text-[var(--faint)]">
                       {toolSteps.length}
                     </span>
@@ -771,7 +790,14 @@ async function pickFiles(list: FileList | null) {
                   </span>
                 </span>
                 <div className="min-w-0 flex-1 pt-1">
-                  <p className="text-[15px] font-medium text-[var(--fg)]">{t("chat.thinking")}</p>
+                  <p className="flex items-center gap-1.5 text-[15px] font-medium text-[var(--fg)]">
+                    {t("chat.thinking")}
+                    <span aria-hidden className="tdots text-[var(--accent-ink)]">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  </p>
                   <p key={hintIdx} className="fade-up mt-1 text-sm text-[var(--muted)]">
                     {hints[hintIdx]}
                   </p>
