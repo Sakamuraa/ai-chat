@@ -17,12 +17,16 @@ import {
   ShareNetwork,
   X,
   PencilSimple,
+  Sun,
+  Moon,
+  ArrowDown,
 } from "@phosphor-icons/react";
 import Markdown from "./markdown";
 import AttachmentPreview from "./attachment-preview";
 import { BrandMark } from "./sidebar";
 import ModelSelect, { MODELS, modelsFor, modelLabel as displayModel, type ModelOption } from "./model-select";
 import { useI18n } from "./i18n";
+import ToolCard, { type ToolStep } from "./tool-card";
 import type { Attachment } from "@/lib/attachments";
 
 export type Msg = {
@@ -47,15 +51,17 @@ type Props = {
 
 type UiAttachment = Attachment;
 
-/** "membaca https://game8.co/games/..." -> "membaca game8.co" (baris tetap satu) */
-function shortStepLabel(label: string): string {
+/** segmen stream ala claude.ai: teks & kartu tool bergantian (bisa >1 putaran) */
+type StreamPart = { k: "text"; v: string } | { k: "tools"; steps: ToolStep[] };
+
+function unusedShortStepGuard(label: string): string {
   const m = label.match(/^(.*?)(https?:\/\/\S+)/);
   if (!m) return label;
   let host = "";
   try {
     host = new URL(m[2]).hostname.replace(/^www\./, "");
   } catch {
-    host = "…";
+    return label;
   }
   return `${m[1].trimEnd()} ${host}`;
 }
@@ -67,15 +73,21 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [messages, setMessages] = useState<Msg[]>(initialMessages);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [streamText, setStreamText] = useState("");
-  // teks model SEBELUM tool pertama = "kalimat pembuka". Kartu tool dirender di
-  // TENGAH-nya (pembuka -> kartu tool -> hasil), persis urutan chat claude.ai.
-  const [preToolText, setPreToolText] = useState("");
-  const preToolRef = useRef(false);
-  const splitRef = useRef(0);
+  // stream dipecah jadi segmen bergantian: pembuka -> kartu -> hasil -> kartu -> …
+  const [streamParts, setStreamParts] = useState<StreamPart[]>([]);
+  /** tombol "Ke bawah": muncul saat user scroll jauh dari dasar */
+  const [showJump, setShowJump] = useState(false);
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+  const toggleTheme = () => {
+    const next = !document.documentElement.classList.contains("dark");
+    document.documentElement.classList.toggle("dark", next);
+    setDark(next);
+  };
   // langkah tool realtime (gaya Claude.ai): ringkasan hitungan + daftar langkah terbuka
-  const [toolSteps, setToolSteps] = useState<{ name?: string; label: string; status: string }[]>([]);
-  const [stepsOpen, setStepsOpen] = useState(true);
   const [error, setError] = useState("");
   const [options, setOptions] = useState<ModelOption[]>([...MODELS]);
   // model terakhir dipilih disimpan di localStorage supaya halaman sesi tak kembali ke model awal
@@ -157,9 +169,11 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
     return () => window.removeEventListener("session-title-changed", onTitle);
   }, []);
 
+  // tanpa autoscroll saat streaming — user bebas scroll ke atas.
+  // scroll otomatis hanya saat pesan baru muncul; sisanya tombol "Ke bawah"
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, streamText]);
+  }, [messages.length]);
 
   useEffect(() => {
     const ta = taRef.current;
@@ -265,13 +279,7 @@ async function pickFiles(list: FileList | null) {
     setError("");
     resumeRef.current = false;
     setStreaming(true);
-    setStreamText("");
-    splitRef.current = 0;
-    if (!opts.keepPanel) {
-      setToolSteps([]);
-      setPreToolText("");
-      preToolRef.current = false;
-    }
+    setStreamParts([]);
     setAckPhase(0);
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     ackTimerRef.current = setTimeout(() => setAckPhase(1), 2200);
@@ -326,23 +334,22 @@ async function pickFiles(list: FileList | null) {
           if (evt === "tool") {
             evt = "";
             try {
-              const step = JSON.parse(payload2) as { name?: string; label: string; status: string };
-              // tool pertama: teks yang sudah mengalir = kalimat pembuka.
-              // Bekukan terpisah supaya kartu tool tampil di antara pembuka & hasil.
-              if (!preToolRef.current && splitRef.current === 0 && acc.length > 0) {
-                splitRef.current = acc.length;
-                preToolRef.current = true;
-                setPreToolText(acc);
-                setStreamText("");
-              }
-              setToolSteps((prev) => {
-                const idx = prev.map((x) => x.label).lastIndexOf(step.label);
-                if (idx >= 0) {
-                  const copy = [...prev];
-                  copy[idx] = step;
-                  return copy;
+              const step = JSON.parse(payload2) as ToolStep;
+              // tool setelah teks = kartu BARU (riwayat bergantian ala claude.ai);
+              // tool beruntun tanpa teks antaranya merge ke kartu terakhir
+              setStreamParts((prev) => {
+                const parts = [...prev];
+                const last = parts[parts.length - 1];
+                if (last && last.k === "tools") {
+                  const steps = [...last.steps];
+                  const idx = steps.map((x) => x.label).lastIndexOf(step.label);
+                  if (idx >= 0) steps[idx] = step;
+                  else steps.push(step);
+                  parts[parts.length - 1] = { k: "tools", steps };
+                } else {
+                  parts.push({ k: "tools", steps: [step] });
                 }
-                return [...prev, step];
+                return parts;
               });
             } catch {
               /* langkah tidak utuh */
@@ -362,7 +369,13 @@ async function pickFiles(list: FileList | null) {
             const piece = obj.choices?.[0]?.delta?.content;
             if (typeof piece === "string") {
               acc += piece;
-              setStreamText(splitRef.current > 0 ? acc.slice(splitRef.current) : acc);
+              setStreamParts((prev) => {
+                const parts = [...prev];
+                const last = parts[parts.length - 1];
+                if (last && last.k === "text") parts[parts.length - 1] = { k: "text", v: last.v + piece };
+                else parts.push({ k: "text", v: piece });
+                return parts;
+              });
             }
           } catch {
             /* potongan tidak utuh */
@@ -379,7 +392,7 @@ async function pickFiles(list: FileList | null) {
         clearTimeout(ackTimerRef.current);
         ackTimerRef.current = null;
       }
-      setStreamText("");
+      setStreamParts([]);
       setStreaming(false);
       abortRef.current = null;
     }
@@ -461,9 +474,6 @@ async function pickFiles(list: FileList | null) {
       acc = acc ? (part ? `${acc}\n\n${part}` : acc) : part;
     }
     if (acc) setMessages((prev) => [...prev, { role: "assistant", content: acc }]);
-    // teks pre-tool sudah termuat di messages — jangan tampil dua kali
-    setPreToolText("");
-    preToolRef.current = false;
 
     if (id === "new") {
       router.replace(`/c/${sid}`);
@@ -507,7 +517,7 @@ async function pickFiles(list: FileList | null) {
     }
   }
 
-  const empty = messages.length === 0 && !streaming && !streamText;
+  const empty = messages.length === 0 && !streaming && streamParts.length === 0;
   const lastAssistantIdx = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "assistant") return i;
     return -1;
@@ -528,6 +538,15 @@ async function pickFiles(list: FileList | null) {
 
         {readOnly ? null : (
           <>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={t("nav.theme")}
+              title={t("nav.theme")}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--fg)]"
+            >
+              {dark ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
             {owner && id !== "new" ? (
               <button
                 onClick={() => void toggleShare()}
@@ -575,7 +594,13 @@ async function pickFiles(list: FileList | null) {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 80);
+        }}
+      >
         {empty ? (
           <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-5 py-10 sm:px-8">
             <div className="fade-up">
@@ -712,7 +737,7 @@ async function pickFiles(list: FileList | null) {
             ))}
 
             {/* urutan ala claude.ai: kalimat pembuka -> kartu tool -> hasil */}
-            {streaming && !streamText && !preToolText && ackPhase === 0 ? (
+            {streaming && streamParts.length === 0 && ackPhase === 0 ? (
               <div className="mb-7 flex items-start gap-3.5">
                 <span className="mt-0.5 hidden shrink-0 sm:block">
                   <BrandMark size={24} />
@@ -725,87 +750,35 @@ async function pickFiles(list: FileList | null) {
                 </div>
               </div>
             ) : null}
-            {preToolText ? (
-              <div className="mb-7 flex gap-3.5">
-                <span className="mt-0.5 hidden shrink-0 sm:block">
-                  <BrandMark size={24} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <Markdown>{preToolText}</Markdown>
-                </div>
-              </div>
-            ) : null}
-            {toolSteps.length > 0 ? (() => {
-              // hitungan gaya Claude.ai: "Menjalankan 4 perintah, membaca 2 berkas, …"
-              const c = { run: 0, read: 0, search: 0, make: 0, other: 0 };
-              for (const s of toolSteps) {
-                if (s.label.startsWith("menjalankan")) c.run++;
-                else if (s.label.startsWith("membaca") || s.label.startsWith("fetch")) c.read++;
-                else if (s.label.startsWith("mencari")) c.search++;
-                else if (s.label.startsWith("membuat")) c.make++;
-                else c.other++;
+            {/* stream bergantian: teks pembuka -> kartu tool -> teks hasil -> kartu baru -> … */}
+            {streamParts.map((p, i) => {
+              const isLast = i === streamParts.length - 1;
+              if (p.k === "tools") {
+                return <ToolCard key={`t${i}`} steps={p.steps} live={streaming && isLast} />;
               }
-              const parts: string[] = [];
-              if (c.run) parts.push(t("chat.sum.run", { n: c.run }));
-              if (c.read) parts.push(t("chat.sum.read", { n: c.read }));
-              if (c.search) parts.push(t("chat.sum.search", { n: c.search }));
-              if (c.make) parts.push(t("chat.sum.make", { n: c.make }));
-              if (c.other) parts.push(t("chat.sum.other", { n: c.other }));
               return (
-                <div className="mb-5 max-w-full rounded-xl border border-[var(--border)] bg-[var(--sidebar)] px-3 py-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setStepsOpen((v) => !v)}
-                    className="flex w-full items-center gap-2 text-left text-xs text-[var(--muted)] transition hover:text-[var(--fg)]"
-                  >
-                    <CaretRight
-                      size={12}
-                      className={`shrink-0 transition-transform ${stepsOpen ? "rotate-90" : ""}`}
-                    />
-                    {streaming ? (
-                      <CircleNotch size={12} className="shrink-0 animate-spin text-[var(--accent-ink)]" />
-                    ) : (
-                      <span aria-hidden className="shrink-0 text-[var(--accent-ink)]">●</span>
-                    )}
-                    <span className="truncate">{parts.join(", ")}</span>
-                    {streaming ? (
-                      <span aria-hidden className="tdots shrink-0 text-[var(--accent-ink)]">
-                        <i />
-                        <i />
-                        <i />
-                      </span>
+                <div key={`x${i}`} className="mb-7 flex gap-3.5">
+                  <span className="mt-0.5 hidden shrink-0 sm:block">
+                    <BrandMark size={24} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <Markdown>{p.v}</Markdown>
+                    {streaming && isLast ? <span className="caret" aria-hidden /> : null}
+                    {isLast ? (
+                      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[10px] uppercase tracking-wider text-[var(--faint)]">
+                        <span className="font-medium">{modelLabel}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-[11px] normal-case tracking-normal">
+                          {t("chat.disclaimer")}
+                        </span>
+                      </div>
                     ) : null}
-                    <span className="ml-auto shrink-0 text-[10px] tabular-nums text-[var(--faint)]">
-                      {toolSteps.length}
-                    </span>
-                  </button>
-                  {stepsOpen ? (
-                    <ul className="mt-2 space-y-1.5 border-t border-[var(--border)] pt-2">
-                      {toolSteps.map((st, i) => (
-                        <li key={`${st.label}-${i}`} className="flex items-center gap-2 text-[11px]">
-                          {st.status === "gagal" ? (
-                            <X size={12} weight="bold" className="shrink-0 text-[var(--danger)]" />
-                          ) : st.status === "selesai" ? (
-                            <Check size={12} weight="bold" className="shrink-0 text-[var(--accent-ink)]" />
-                          ) : (
-                            <CircleNotch size={12} className="shrink-0 animate-spin text-[var(--accent-ink)]" />
-                          )}
-                          <span
-                            className={`truncate ${
-                              st.status === "gagal" ? "text-[var(--danger)]" : "text-[var(--muted)]"
-                            }`}
-                          >
-                            {shortStepLabel(st.label)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
+                  </div>
                 </div>
               );
-            })() : null}
+            })}
 
-            {streaming && !streamText && ackPhase === 1 ? (
+            {streaming && streamParts.length === 0 && ackPhase === 1 ? (
               <div className="mb-7 flex items-center gap-2">
                 <span className="sr-only" role="status">
                   {t("chat.thinking")}
@@ -815,23 +788,6 @@ async function pickFiles(list: FileList | null) {
                   <i />
                   <i />
                 </span>
-              </div>
-            ) : null}
-
-            {streamText ? (
-              <div className="mb-7 flex gap-3.5">
-                <span className="mt-0.5 hidden shrink-0 sm:block">
-                  <BrandMark size={24} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <Markdown>{streamText}</Markdown>
-                  <span className="caret" aria-hidden />
-                  <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[10px] uppercase tracking-wider text-[var(--faint)]">
-                    <span className="font-medium">{modelLabel}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="text-[11px] normal-case tracking-normal">{t("chat.disclaimer")}</span>
-                  </div>
-                </div>
               </div>
             ) : null}
 
@@ -846,7 +802,18 @@ async function pickFiles(list: FileList | null) {
       </div>
 
       {readOnly ? null : (
-        <div className="border-t border-[var(--border)] bg-[var(--bg)] px-5 pb-5 pt-4">
+        <div className="relative border-t border-[var(--border)] bg-[var(--bg)] px-5 pb-5 pt-4">
+          {showJump ? (
+            <button
+              type="button"
+              onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })}
+              aria-label={t("chat.jumpBottom")}
+              className="fade-up absolute -top-4 right-6 z-10 flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs text-[var(--muted)] shadow-[0_8px_24px_-10px_rgba(0,0,0,0.45)] transition hover:text-[var(--fg)]"
+            >
+              <ArrowDown size={13} />
+              {t("chat.jumpBottom")}
+            </button>
+          ) : null}
           <div className="mx-auto w-full max-w-3xl rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_6px_18px_rgba(0,0,0,0.05)] transition focus-within:border-[var(--border-strong)] focus-within:shadow-[0_2px_6px_rgba(0,0,0,0.10),0_10px_28px_rgba(0,0,0,0.08)]">
             {attachments.length > 0 ? (
               <div className="mb-2 px-1">

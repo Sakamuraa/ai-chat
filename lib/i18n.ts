@@ -9,6 +9,7 @@ export const LANGS: { code: Lang; label: string }[] = [
 type Dict = Record<string, string>;
 
 const id: Dict = {
+  "nav.theme": "Ganti tema",
   "nav.newChat": "Chat baru",
   "nav.search": "Cari sesi",
   "nav.today": "Hari ini",
@@ -129,6 +130,7 @@ const id: Dict = {
   "chat.sum.make": "Membuat {n} berkas",
   "chat.sum.other": "{n} alat lainnya",
   "chat.ack": "Saya cek dulu…",
+  "chat.jumpBottom": "Ke bawah",
   "chat.hint1": "Membaca konteks percakapan…",
   "chat.hint2": "Menyusun jawaban terbaik…",
   "chat.hint3": "Memeriksa detail sebelum menjawab…",
@@ -219,6 +221,7 @@ const id: Dict = {
 };
 
 const en: Dict = {
+  "nav.theme": "Toggle theme",
   "nav.newChat": "New chat",
   "nav.search": "Search chats",
   "nav.today": "Today",
@@ -339,6 +342,7 @@ const en: Dict = {
   "chat.sum.make": "Created {n} files",
   "chat.sum.other": "{n} other tools",
   "chat.ack": "Let me check first…",
+  "chat.jumpBottom": "Jump to bottom",
   "chat.hint1": "Reading the conversation…",
   "chat.hint2": "Shaping the best answer…",
   "chat.hint3": "Checking details before replying…",
