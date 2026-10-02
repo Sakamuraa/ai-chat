@@ -87,7 +87,6 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
   const [heading, setHeading] = useState(title);
   const [attachments, setAttachments] = useState<UiAttachment[]>([]);
   const [attachMenu, setAttachMenu] = useState(false);
-  const [hintIdx, setHintIdx] = useState(0);
   // fase sebelum token pertama: 0 = baris ack "Saya cek dulu…", 1 = kartu thinking
   const [ackPhase, setAckPhase] = useState(0);
   const ackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,12 +162,6 @@ export default function ChatView({ sessionId, title, model, initialMessages, rea
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 220)}px`;
   }, [input]);
-
-  useEffect(() => {
-    if (!streaming || streamText) return;
-    const iv = setInterval(() => setHintIdx((i) => (i + 1) % 4), 1900);
-    return () => clearInterval(iv);
-  }, [streaming, streamText]);
 
 
   // draft dari halaman awal (chat pertama) — dilewati di mode hanya-baca
@@ -498,7 +491,6 @@ async function pickFiles(list: FileList | null) {
     for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "assistant") return i;
     return -1;
   }, [messages]);
-  const hints = [t("chat.hint1"), t("chat.hint2"), t("chat.hint3"), t("chat.hint4")];
   const modelLabel = options.find((m) => m.id === currentModel)?.label ?? currentModel;
 
   return (
@@ -783,28 +775,15 @@ async function pickFiles(list: FileList | null) {
             ) : null}
 
             {streaming && !streamText && ackPhase === 1 ? (
-              <div className="mb-7 flex items-start gap-3.5">
-                <span className="mt-0.5 hidden shrink-0 sm:block">
-                  <span className="block animate-pulse">
-                    <BrandMark size={24} />
-                  </span>
+              <div className="mb-7 flex items-center gap-2">
+                <span className="sr-only" role="status">
+                  {t("chat.thinking")}
                 </span>
-                <div className="min-w-0 flex-1 pt-1">
-                  <p className="flex items-center gap-1.5 text-[15px] font-medium text-[var(--fg)]">
-                    {t("chat.thinking")}
-                    <span aria-hidden className="tdots text-[var(--accent-ink)]">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                  </p>
-                  <p key={hintIdx} className="fade-up mt-1 text-sm text-[var(--muted)]">
-                    {hints[hintIdx]}
-                  </p>
-                  <div className="mt-3 h-1.5 w-40 overflow-hidden rounded-full bg-[var(--border)]">
-                    <div className="h-full w-1/3 animate-[shimmer_1.4s_ease-in-out_infinite] rounded-full bg-[var(--accent)]" />
-                  </div>
-                </div>
+                <span aria-hidden className="tdots tdots-lg text-[var(--accent-ink)]">
+                  <i />
+                  <i />
+                  <i />
+                </span>
               </div>
             ) : null}
 

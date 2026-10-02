@@ -266,6 +266,11 @@ body {
 }
 .tdots i:nth-child(2) { animation-delay: 0.17s; }
 .tdots i:nth-child(3) { animation-delay: 0.34s; }
+/* varian besar: satu-satunya isi blok "berpikir" */
+.tdots-lg i {
+  width: 6px;
+  height: 6px;
+}
 @keyframes tdot {
   0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
   40% { opacity: 1; transform: translateY(-3px); }
