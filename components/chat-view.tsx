@@ -528,7 +528,7 @@ async function pickFiles(list: FileList | null) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="chat-header relative flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-3 backdrop-blur-md sm:px-5">
+      <header className="chat-header relative z-30 flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-3 backdrop-blur-md sm:px-5">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium tracking-tight" title={displayTitle}>
             {displayTitle}

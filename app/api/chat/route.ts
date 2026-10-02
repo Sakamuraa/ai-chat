@@ -224,7 +224,22 @@ export async function POST(req: Request) {
   // Tersimpan TANPA teks lampiran (permintaan Manuel): bubble user hanya menampilkan yang diketik.
   // Isi dokumen dipasang ulang saat membangun riwayat untuk model (lihat bawah).
   const userText = content;
-  const images = (attachments ?? []).filter((a) => a.kind === "image");
+  // lampiran utk edit datang "slim" dari klien (data dibuang utk berkas besar — lihat
+  // slimAttachments). Pulihkan dari pesan asli SEBELUM dipakai utk vision & disimpan
+  // ulang: tanpa ini base64 kosong -> provider 400 dan preview tinggal nama file saja.
+  let attList = attachments ?? [];
+  if (editMessageId && attList.length > 0) {
+    const oldRows = (await db()`
+      SELECT attachments FROM messages WHERE id = ${editMessageId} AND session_id = ${sessionId}
+    `) as unknown as { attachments: { name: string; kind: string; mime: string; data: string }[] | null }[];
+    const oldAtt = oldRows[0]?.attachments ?? [];
+    attList = attList.map((a) => {
+      if (a.data) return a;
+      const o = oldAtt.find((x) => x.name === a.name && x.kind === a.kind);
+      return o ? { ...a, data: o.data } : a;
+    });
+  }
+  const images = attList.filter((a) => a.kind === "image");
 
   // 2. simpan pesan user
   //    - regenerate: buang jawaban terakhir, prompt tetap
@@ -233,8 +248,13 @@ export async function POST(req: Request) {
     // lanjut dari checkpoint — pesan user & judul sudah tercatat pada request pertama
   } else if (editMessageId) {
     const target = (await db()`
-      SELECT id, created_at, role FROM messages WHERE id = ${editMessageId} AND session_id = ${sessionId}
-    `) as unknown as { id: string; created_at: string; role: string }[];
+      SELECT id, created_at, role, attachments FROM messages WHERE id = ${editMessageId} AND session_id = ${sessionId}
+    `) as unknown as {
+      id: string;
+      created_at: string;
+      role: string;
+      attachments: { name: string; kind: string; mime: string; data: string }[] | null;
+    }[];
     if (!target[0] || target[0].role !== "user") {
       return NextResponse.json({ error: "message_not_found" }, { status: 404 });
     }
@@ -246,9 +266,10 @@ export async function POST(req: Request) {
           WHERE id = ${editMessageId} AND session_id = ${sessionId}
         )
     `;
+    // data lampiran sudah dipulihkan di atas (attList) — simpan utuh
     await db()`
       INSERT INTO messages (session_id, role, content, attachments)
-      VALUES (${sessionId}, 'user', ${userText}, ${JSON.stringify(attachments ?? [])}::jsonb)
+      VALUES (${sessionId}, 'user', ${userText}, ${JSON.stringify(attList)}::jsonb)
     `;
     await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
   } else if (regenerate) {

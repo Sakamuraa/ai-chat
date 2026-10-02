@@ -1,10 +1,12 @@
 // language: TypeScript, file: components/markdown.tsx, target: client component (kutipan, ikon sumber, lightbox gambar)
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Copy } from "@phosphor-icons/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { useI18n } from "./i18n";
 
 /** Gambar inline — klik untuk preview penuh (lightbox), Esc/klik luar untuk menutup. */
 function PreviewableImage({ src, alt }: { src: string; alt: string }) {
@@ -74,6 +76,38 @@ function LinkIcon() {
   );
 }
 
+/** teks murni dari node React (utk tombol salin kode) */
+function nodeText(n: unknown): string {
+  if (n === null || n === undefined || typeof n === "boolean") return "";
+  if (typeof n === "string" || typeof n === "number") return String(n);
+  if (Array.isArray(n)) return n.map(nodeText).join("");
+  const el = n as { props?: { children?: unknown } };
+  if (el && typeof el === "object" && "props" in el) return nodeText(el.props?.children);
+  return "";
+}
+
+/** Blok kode (``` … ```) dgn tombol salin di kanan atas — ala Claude/ChatGPT. */
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard.writeText(nodeText(children));
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1600);
+        }}
+        className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px] text-[var(--muted)] opacity-0 shadow-sm transition group-hover:opacity-100 focus:opacity-100 hover:text-[var(--fg)]"
+      >
+        <Copy size={12} /> {copied ? t("chat.copied") : t("chat.copy")}
+      </button>
+      <pre>{children}</pre>
+    </div>
+  );
+}
+
 export default function Markdown({ children }: { children: string }) {
   return (
     <div className="md">
@@ -95,6 +129,7 @@ export default function Markdown({ children }: { children: string }) {
           img: ({ src, alt }) => (
             <PreviewableImage src={typeof src === "string" ? src : ""} alt={typeof alt === "string" ? alt : ""} />
           ),
+          pre: ({ children: isi }) => <CodeBlock>{isi}</CodeBlock>,
         }}
       >
         {children}
