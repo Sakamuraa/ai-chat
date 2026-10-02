@@ -367,7 +367,9 @@ async function pickFiles(list: FileList | null) {
               continue;
             }
             const piece = obj.choices?.[0]?.delta?.content;
-            if (typeof piece === "string") {
+            // piece kosong (penanda keep-alive) tak boleh membuat segmen teks —
+            // dulu bikin bubble caret + footer kosong sebelum teks asli datang
+            if (typeof piece === "string" && piece) {
               acc += piece;
               setStreamParts((prev) => {
                 const parts = [...prev];
