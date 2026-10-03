@@ -16,6 +16,8 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { useI18n } from "./i18n";
+import { Avatar } from "./avatar";
+import { PLANS } from "@/lib/plans";
 import { AccountModal } from "./account-modal";
 
 type Session = {
@@ -84,6 +86,8 @@ export default function Sidebar() {
   // modal akun (permintaan Manuel, 2026-09-26): klik profil -> popup menu akun
   const [accountOpen, setAccountOpen] = useState(false);
   const [meName, setMeName] = useState("");
+  const [meAvatar, setMeAvatar] = useState<string | null>(null);
+  const [planLabel, setPlanLabel] = useState<string | null>(null);
   // tekan-tahan sesi (mobile) -> modal opsi
   const [held, setHeld] = useState<Session | null>(null);
   const holdTimer = useRef<number | null>(null);
@@ -116,8 +120,17 @@ export default function Sidebar() {
       setLoaded(true);
       fetch("/api/me")
         .then((res) => (res.ok ? res.json() : null))
-        .then((b: { user?: { username?: string } } | null) => {
+        .then((b: { user?: { username?: string; avatar_url?: string | null } } | null) => {
           if (b?.user?.username) setMeName(b.user.username);
+          if (b?.user?.avatar_url) setMeAvatar(b.user.avatar_url);
+        })
+        .catch(() => undefined);
+      fetch("/api/subscriptions/me")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((b: { plan?: string } | null) => {
+          if (!b?.plan) return;
+          const label = PLANS.find((p) => p.id === b.plan)?.label ?? b.plan;
+          setPlanLabel(label);
         })
         .catch(() => undefined);
     } catch {
@@ -378,15 +391,19 @@ export default function Sidebar() {
             className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition hover:bg-[var(--border)]/60"
             aria-haspopup="dialog"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--border)] text-xs font-semibold text-[var(--fg)]">
-              {(meName.trim()[0] || "O").toUpperCase()}
-            </span>
+            <Avatar url={meAvatar} name={meName} size={28} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium text-[var(--fg)]">
                 {meName || "Akun"}
               </span>
-              <span className="block truncate text-[11px] text-[var(--faint)]">
-                {t("account.title")}
+              <span
+                className={`block truncate text-[11px] ${
+                  planLabel && planLabel !== "Standard"
+                    ? "font-medium text-[var(--accent-ink)]"
+                    : "text-[var(--faint)]"
+                }`}
+              >
+                {planLabel ?? t("account.title")}
               </span>
             </span>
             <CaretRight size={13} className="shrink-0 text-[var(--faint)]" />

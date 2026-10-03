@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Avatar } from "./avatar";
 import {
   ArrowsLeftRight,
   ArrowLeft,
@@ -29,23 +30,6 @@ type Me = { id?: string; username?: string; email?: string | null; avatar_url?: 
 type Slot = { id: string; username: string; email: string | null; avatarUrl: string | null; current: boolean };
 
 /** Bulatan akun: foto profil kalau ada, kalau tidak huruf awal nama. */
-function Avatar({ url, name, size = 36 }: { url?: string | null; name?: string; size?: number }) {
-  const initial = ((name || "").trim()[0] || "O").toUpperCase();
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--accent)_26%,var(--border))] font-semibold text-[var(--fg)]"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
-    >
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="h-full w-full object-cover" onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} />
-      ) : (
-        initial
-      )}
-    </span>
-  );
-}
-
 export function AccountModal({
   open,
   onClose,
