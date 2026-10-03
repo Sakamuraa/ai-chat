@@ -26,6 +26,7 @@ describe("paket model", () => {
       "onheil-2-asteria",
       "claude-opus-5-5",
       "claude-fable-5-1",
+      "gemini-3.8-flash",
     ]);
   });
 

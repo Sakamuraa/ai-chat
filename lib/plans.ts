@@ -3,7 +3,7 @@
  * Paket (permintaan Manuel, 2026-09-24; dirapikan 2026-09-30):
  *   free -> onheil-1.1-luna, onheil-1.1-aria
  *   pro  -> + onheil-1.5-selenia, onheil-2-asteria
- *   max  -> + claude-opus-5-5, claude-fable-5-1
+ *   max  -> + claude-opus-5-5, claude-fable-5-1, gemini-3.8-flash
  * 2026-09-30 (hanya frontend): solaria, celestia, istaroth DIHAPUS dari daftar;
  * claude-opus-5-5 (koreksi Manuel): asteria naik ke Pro, dua model Claude = Max;
  * claude-fable-5-1 ditambahkan ke Max. Keduanya sudah ada di 9router.
@@ -46,6 +46,7 @@ export const MODEL_LABELS: Record<string, string> = {
   "onheil-2-asteria": "Onheil 2 Asteria",
   "claude-opus-5-5": "Claude Opus 5.5",
   "claude-fable-5-1": "Claude Fable 5.1",
+  "gemini-3.8-flash": "Gemini 3.8 Flash",
 };
 
 const RANK: Record<Plan, number> = { free: 0, pro: 1, max: 2 };
@@ -60,6 +61,7 @@ export const PLAN_MODELS: Record<Plan, string[]> = {
     "onheil-2-asteria",
     "claude-opus-5-5",
     "claude-fable-5-1",
+    "gemini-3.8-flash",
   ],
 };
 
@@ -107,4 +109,5 @@ export const MODEL_BADGE: Record<string, string> = {
   "onheil-2-asteria": "Pro",
   "claude-opus-5-5": "Max",
   "claude-fable-5-1": "Max",
+  "gemini-3.8-flash": "Max",
 };
