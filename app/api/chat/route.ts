@@ -385,6 +385,62 @@ export async function POST(req: Request) {
   let reader = gateway.body!.getReader();
   const dec = new TextDecoder();
   const enc = new TextEncoder();
+
+  /**
+   * Buka stream ronde lanjutan dgn retry — upstream flaky (bukti: 502
+   * provider "gatekey" di usageHistory 9router 2026-10-03 02:30:28 membuat
+   * chat xlsx "Created 1 files" lalu berhenti tanpa jawaban final).
+   * 5xx/429/408/network diulang 3× (backoff 1.5s/3s); abort klien TIDAK di-retry.
+   */
+  const openRound = async (
+    msgs: ChatMsg[],
+    toolChoice: "auto" | "none" = "auto",
+  ): Promise<Response> => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (abort.signal.aborted) throw lastErr ?? new Error("aborted");
+      try {
+        return await streamChat(model, msgs, abort.signal, tools, toolChoice);
+      } catch (e) {
+        lastErr = e;
+        const st = (e as { status?: number } | null)?.status;
+        const retriable = st === undefined || st === 408 || st === 429 || st >= 500;
+        if (!retriable || attempt === 2) throw e;
+        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+      }
+    }
+    throw lastErr;
+  };
+
+  /** Gagal total setelah retry -> jangan mati diam: sisa teks + ringkasan hasil
+   *  tool dikirim sbg jawaban final lalu disimpan (chat tetap punya penutup). */
+  const forceFinalize = async (ctrl: ReadableStreamDefaultController<Uint8Array>) => {
+    const base = (allText + roundText).trim();
+    const tail = lastResults.length
+      ? "\n\n**Hasil tool (tersimpan):**\n\n" + lastResults.join("\n\n").slice(0, 3000)
+      : "";
+    const text =
+      (base ||
+        "Koneksi ke model terputus di tengah tugas setelah tool berjalan. Hasilnya tetap tersimpan — kirim ulang pesannya untuk melanjutkan.") +
+      tail;
+    ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`));
+    ctrl.enqueue(enc.encode("data: [DONE]\n\n"));
+    try {
+      await db()`
+        INSERT INTO messages (session_id, role, content, model) VALUES (${sessionId}, 'assistant', ${text}, ${model})
+      `;
+      await db()`UPDATE sessions SET updated_at = now() WHERE id = ${sessionId}`;
+      await db()`DELETE FROM chat_checkpoints WHERE session_id = ${sessionId}`;
+      flushUsage();
+      await addUsage(
+        user.id,
+        usageTotal > 0 ? usageTotal : estimateTokens(text) + estimateTokens(userText),
+      );
+    } catch (e) {
+      console.error("forced final persist failed", e);
+    }
+    ctrl.close();
+  };
   let lineBuf = "";
   let allText = "";
   let roundText = "";
@@ -534,12 +590,18 @@ export async function POST(req: Request) {
                 },
               ];
             }
-            gateway = paksaFinal
-              // ronde final: tools + tool_choice "none" — model diberi tahu struktural
-              // bahwa tool dilarang, jadi ia menjawab dari ringkasan, bukan mengulang
-              // tool-call sebagai teks DSML (bug istaroth 2026-09-26)
-              ? await streamChat(model, conv, abort.signal, tools, "none")
-              : await streamChat(model, conv, abort.signal, tools);
+            let nextGateway: Response | null = null;
+            try {
+              nextGateway = await openRound(conv, paksaFinal ? "none" : "auto");
+            } catch (e) {
+              if (abort.signal.aborted) throw e;
+              console.error("round open failed after retry, forcing final:", e);
+            }
+            if (!nextGateway) {
+              await forceFinalize(ctrl);
+              return;
+            }
+            gateway = nextGateway;
             reader = gateway.body!.getReader();
             continue;
           }
@@ -561,12 +623,7 @@ export async function POST(req: Request) {
             lineBuf = "";
             calls.length = 0;
             flushUsage();
-            gateway = await streamChat(
-              model,
-              [...conv, { role: "user" as const, content: CONTINUE_NUDGE }],
-              abort.signal,
-              tools,
-            );
+            gateway = await openRound([...conv, { role: "user" as const, content: CONTINUE_NUDGE }]);
             reader = gateway.body!.getReader();
             continue;
           }
@@ -582,10 +639,10 @@ export async function POST(req: Request) {
             calls.length = 0;
             try {
               flushUsage();
-              gateway = await streamChat(model, [
-                ...conv,
-                { role: "user", content: "Jawab sekarang, langsung ke inti tanpa tool." },
-              ], abort.signal, tools, "none");
+              gateway = await openRound(
+                [...conv, { role: "user", content: "Jawab sekarang, langsung ke inti tanpa tool." }],
+                "none",
+              );
               reader = gateway.body!.getReader();
               const { value, done } = await reader.read();
               if (value) { feed(value); ctrl.enqueue(value); }
