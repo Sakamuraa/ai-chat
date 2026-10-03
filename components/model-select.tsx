@@ -13,6 +13,7 @@ export const MODELS = [
   { id: "onheil-2-asteria", label: "Onheil 2 Asteria" },
   { id: "claude-opus-5-5", label: "Claude Opus 5.5" },
   { id: "claude-fable-5-1", label: "Claude Fable 5.1" },
+  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
 ] as const;
 
 export function modelsFor(plan: string): ModelOption[] {

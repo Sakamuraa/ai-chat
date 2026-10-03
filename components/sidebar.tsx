@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BookOpen,
   CaretRight,
   ChatsCircle,
   List,
@@ -232,7 +233,18 @@ export default function Sidebar() {
               <Plus size={16} weight="bold" />
               {t("nav.newChat")}
             </Link>
+            <Link
+              href="/docs"
+              onClick={closeOnMobile}
+              className="mt-2 flex w-full items-center gap-2 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--border)]/45 hover:text-[var(--fg)] active:scale-[0.98]"
+            >
+              <BookOpen size={16} />
+              {t("nav.docs")}
+            </Link>
           </div>
+
+          {/* garis samar pemisah — pisahkan navigasi atas dari kolom cari sesi */}
+          <div className="mx-3 mb-3 h-px bg-[var(--border)]/70" />
 
           <div className="px-3 pb-3">
             <div className="relative">

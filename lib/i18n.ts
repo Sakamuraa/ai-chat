@@ -11,6 +11,7 @@ type Dict = Record<string, string>;
 const id: Dict = {
   "nav.theme": "Ganti tema",
   "nav.newChat": "Chat baru",
+  "nav.docs": "Dokumen",
   "nav.search": "Cari sesi",
   "nav.today": "Hari ini",
   "nav.week": "7 hari terakhir",
@@ -223,6 +224,7 @@ const id: Dict = {
 const en: Dict = {
   "nav.theme": "Toggle theme",
   "nav.newChat": "New chat",
+  "nav.docs": "Docs",
   "nav.search": "Search chats",
   "nav.today": "Today",
   "nav.week": "Previous 7 days",
