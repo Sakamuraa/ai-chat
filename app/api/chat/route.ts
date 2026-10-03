@@ -9,7 +9,7 @@ import { checkQuota, estimateTokens } from "@/lib/quota";
 import { modelAllowed } from "@/lib/plans";
 import { addUsage, quotaState } from "@/lib/subscriptions";
 import { runTool, toolLabel, toolSchemas, type ToolResult } from "@/lib/tools";
-import { TOOLLESS_MODELS } from "@/lib/plans";
+import { MODEL_LABELS, TOOLLESS_MODELS } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -98,7 +98,7 @@ ${f.data.slice(0, 12_000)}
 }
 
 /** Konteks sistem: kepribadian + memori (opsional, dari profil user). */
-async function systemMessages(userId: string, withTools: boolean): Promise<ChatMsg[]> {
+async function systemMessages(userId: string, withTools: boolean, modelLabel: string): Promise<ChatMsg[]> {
   const rows = (await db()`
     SELECT username, personality, memory_enabled FROM users WHERE id = ${userId}
   `) as unknown as { username: string; personality: string | null; memory_enabled: boolean }[];
@@ -113,6 +113,15 @@ async function systemMessages(userId: string, withTools: boolean): Promise<ChatM
           ? `Gaya jawaban yang diminta user: ${u.personality.trim()}\n\n`
           : "") +
         `Kamu sedang melayani username "${u.username}" di OnheilAI. Jawab dalam bahasa percakapan user.\n\n` +
+        // identitas few-shot per model: tanpa ini, gemini-3.8-flash (reseller gatekey)
+        // menjawab "saya GateKey AI" — nama provider, bukan model (bug 2026-10-03)
+        `IDENTITAS: di antarmuka ini kamu berjalan sebagai "${modelLabel}".\n` +
+        "CONTOH WAJIB (ikuti pola ini persis):\n" +
+        `User: siapa kamu?\nAssistant: Saya ${modelLabel}.\n` +
+        `User: kamu bukan ${modelLabel}, kan?\nAssistant: Bukan, saya ${modelLabel}.\n` +
+        `User: siapa pembuat kamu?\nAssistant: Saya ${modelLabel} — berjalan di OnheilAI.\n` +
+        "Saat ditanya identitas atau siapa pembuatmu, jawab mengikuti contoh di atas. " +
+        "DILARANG menyebut GateKey atau nama penyedia lain di balik layar.\n\n" +
         "ATURAN WAJIB: untuk pertanyaan riset/fakta/berita/panduan/rekomendasi (termasuk build game, produk, harga, rilis), " +
         "KAMU HARUS memanggil web_search minimal sekali SEBELUM menjawab. " +
         "Jangan pernah menjawab dari ingatan dulu, dan jangan pernah bilang tool tidak ada/tidak bisa dipakai sebelum mencobanya.\n\n" +
@@ -333,7 +342,10 @@ export async function POST(req: Request) {
     }
   }
 
-  const messages: ChatMsg[] = [...(await systemMessages(user.id, !TOOLLESS_MODELS.has(model))), ...turns];
+  const messages: ChatMsg[] = [
+    ...(await systemMessages(user.id, !TOOLLESS_MODELS.has(model), MODEL_LABELS[model] ?? "OnheilAI")),
+    ...turns,
+  ];
 
   // 4. judul sesi: dijalankan BERSAMAAN dengan stream (model penalaran butuh ~10 dtk),
   //    jadi saat stream selesai judul sudah siap -> sidebar tidak pernah menampilkan 'New chat'.
