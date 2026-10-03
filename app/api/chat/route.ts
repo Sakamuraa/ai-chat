@@ -409,7 +409,10 @@ export async function POST(req: Request) {
     toolChoice: "auto" | "none" = "auto",
   ): Promise<Response> => {
     let lastErr: unknown;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // GateKey: "Model sedang gagal merespons … silakan ulangi sebentar lagi" (upstream_error)
+    // -> backoff sabar 2/4/8/15s, total 5 percobaan dalam ~29 dtk
+    const delays = [2_000, 4_000, 8_000, 15_000];
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
       if (abort.signal.aborted) throw lastErr ?? new Error("aborted");
       try {
         return await streamChat(model, msgs, abort.signal, tools, toolChoice);
@@ -417,8 +420,8 @@ export async function POST(req: Request) {
         lastErr = e;
         const st = (e as { status?: number } | null)?.status;
         const retriable = st === undefined || st === 408 || st === 429 || st >= 500;
-        if (!retriable || attempt === 2) throw e;
-        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+        if (!retriable || attempt === delays.length) throw e;
+        await new Promise((res) => setTimeout(res, delays[attempt]));
       }
     }
     throw lastErr;
@@ -433,8 +436,10 @@ export async function POST(req: Request) {
       : "";
     const text =
       (base ||
-        "Koneksi ke model terputus di tengah tugas setelah tool berjalan. Hasilnya tetap tersimpan — kirim ulang pesannya untuk melanjutkan.") +
-      tail;
+        "Jawaban final belum terkirim — gangguan dari penyedia model. Hasil tool tetap tersimpan.") +
+      tail +
+      "\n\n> **Gangguan sementara dari penyedia model** (GateKey upstream_error) — jawaban final gagal setelah beberapa kali ulang. " +
+      "Kirim ulang pesan untuk melanjutkan; hasil tool di atas tetap tersimpan.";
     ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`));
     ctrl.enqueue(enc.encode("data: [DONE]\n\n"));
     try {
